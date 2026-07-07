@@ -35,8 +35,9 @@ const DeliveryMemo = () => {
       sx={{
         display: "flex",
         flexDirection: { xs: "column", md: "row" },
-        minHeight: "100vh",
+        height: "100%",
         backgroundColor: "#f9fafb",
+        overflow: "hidden",
       }}
     >
 
@@ -60,3 +61,4 @@ const DeliveryMemo = () => {
 };
 
 export default DeliveryMemo;
+ 
