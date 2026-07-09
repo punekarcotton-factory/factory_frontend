@@ -1,4 +1,4 @@
-​import {
+import {
   Badge,
   Box,
   Button,
@@ -22,7 +22,7 @@
 } from "@mui/material";
 import { Palette, Person, Phone, ExpandMore, Notes } from "@mui/icons-material";
 import { useEffect, useState, useCallback } from "react";
-import { getMemoTitle } from "../../utils/deliveryMemo";
+import { getMemoTitle, getMemoSubtitle } from "../../utils/deliveryMemo";
 import { useSelector, useDispatch } from "react-redux";
 import AssignKanchButtonDialog from "../../Modals/AssignKanchButtonDialog";
 import KanchButtonProgressModal from "../../Modals/KanchButtonProgressModal";
@@ -556,7 +556,17 @@ const KanchButtonStage = () => {
                                   minWidth: 0,
                                 }}
                               >
-                                {getMemoTitle(memo)}
+                                {memo.dmNumber && (
+                                  <Typography
+                                    component="span"
+                                    sx={{ fontSize: "15px", color: "#111827", fontWeight: 700, display: "block" }}
+                                  >
+                                    {memo.dmNumber}
+                                  </Typography>
+                                )}
+                                <Typography component="span" sx={{ fontSize: "11px", color: "#6b7280", fontWeight: 500, display: "block" }}>
+                                  {getMemoSubtitle(memo) || getMemoTitle(memo)}
+                                </Typography>
                               </Typography>
                             </Tooltip>
                             <Box
