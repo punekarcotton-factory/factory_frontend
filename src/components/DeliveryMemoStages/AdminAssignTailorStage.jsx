@@ -1,4 +1,4 @@
-​import {
+import {
   Badge,
   Box,
   Button,
@@ -22,13 +22,14 @@
 } from "@mui/material";
 import { Palette, ExpandMore, Notes } from "@mui/icons-material";
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import AssignMultipleTailorsModal from "../../Modals/AssignMultipleTailorsModal";
 import TailorAssignmentsDrawer from "../../components/TailorAssignmentsDrawer";
 import MemoDetailDrawer from "../../Modals/MemoDetailDrawer";
 import DamageModal from "../../Modals/DamageModal";
 import NoResponsePage from "../../pages/NoResponsePage";
-import { getMemoTitle } from "../../utils/deliveryMemo";
+import { getMemoTitle, getMemoSubtitle } from "../../utils/deliveryMemo";
 import axiosInstance from "../../utils/axiosInstance";
 import { CreateButton } from "../Styled";
 import { showSnackbar } from "../../Slice/snackbarSlice";
@@ -39,11 +40,24 @@ import moment from "moment";
 const AdminAssignTailorStage = () => {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
+  const location = useLocation();
 
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      return location.state.activeTab;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
+
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [selectedMemoForDetails, setSelectedMemoForDetails] = useState(null);
   const [assignmentSummary, setAssignmentSummary] = useState(null);
@@ -55,6 +69,7 @@ const AdminAssignTailorStage = () => {
   const [selectedMemoForAssignments, setSelectedMemoForAssignments] =
     useState(null);
   const [tailorNames, setTailorNames] = useState({});
+  const [memoDmNumbers, setMemoDmNumbers] = useState({});
 
   const fetchAssignTailorMemos = useCallback(async () => {
     try {
@@ -93,27 +108,25 @@ const AdminAssignTailorStage = () => {
 
   useEffect(() => {
     const fetchTailorNames = async () => {
-      const assignedMemos = memos.filter(
-        (m) =>
-          m.tailorAssignmentStatus === "ASSIGNED" ||
-          m.tailorAssignmentStatus === "COMPLETED",
-      );
+      const assignedMemos = memos;
 
       const names = {};
+      const dmNumbers = {};
       for (const memo of assignedMemos) {
         try {
           const response = await axiosInstance.get(
             `/assign-tailor/${memo._id}/assignment-summary`,
           );
-          const tailors = response.data.data.assignments?.map(
-            (a) => a.tailor.name,
-          );
-          names[memo._id] = tailors || [];
+          const data = response.data.data;
+          names[memo._id] = data.assignments?.map((a) => a.tailor.name) || [];
+          dmNumbers[memo._id] = data.dmNumber;
         } catch (err) {
-          console.error(`Failed to fetch tailors for memo ${memo._id}`);
+          console.error(`Failed to fetch summary for memo ${memo._id}`);
         }
       }
+
       setTailorNames(names);
+      setMemoDmNumbers(dmNumbers);
     };
 
     if (memos.length > 0) {
@@ -378,8 +391,8 @@ const AdminAssignTailorStage = () => {
 
   return (
     <>
-      <Box sx={{ minHeight: "100%", pb: 4, mt: 3 }}>
-        <Container maxWidth={false} disableGutters sx={{ px: 3 }}>
+      <Box sx={{ minHeight: "100%", pb: 1, mt: 1 }}>
+        <Container maxWidth={false} disableGutters sx={{ px: 1 }}>
           {/* Tabs */}
           <Paper
             elevation={0}
@@ -571,7 +584,18 @@ const AdminAssignTailorStage = () => {
                                   minWidth: 0,
                                 }}
                               >
-                                {getMemoTitle(memo)}
+                                {(memo.dmNumber || memoDmNumbers[memo._id]) && (
+                                  <Typography
+                                    component="span"
+                                    sx={{ fontSize: "15px", color: "#111827", fontWeight: 700, display: "block" }}
+                                  >
+                                    {memo.dmNumber || memoDmNumbers[memo._id]}
+                                  </Typography>
+                                )}
+                                <Typography component="span" sx={{ fontSize: "11px", color: "#6b7280", fontWeight: 500, display: "block" }}>
+                                  {getMemoSubtitle(memo) || getMemoTitle(memo)}
+                                </Typography>
+
                               </Typography>
                             </Tooltip>
                             <Box
@@ -605,9 +629,7 @@ const AdminAssignTailorStage = () => {
                               color: "#6b7280",
                             }}
                           >
-                            {moment
-                              .utc(memo.createdAt)
-                              .format("DD/MM/YYYY HH:mm")}
+                           {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                           </Typography>
                         </Box>
 
@@ -779,7 +801,7 @@ const AdminAssignTailorStage = () => {
                           </Typography>
 
                           {memo.tailorAssignmentStatus === "ASSIGNED" ||
-                          memo.tailorAssignmentStatus === "COMPLETED" ? (
+                            memo.tailorAssignmentStatus === "COMPLETED" ? (
                             <Typography
                               sx={{
                                 fontSize: "13px",
@@ -789,12 +811,12 @@ const AdminAssignTailorStage = () => {
                             >
                               {tailorNames[memo._id]?.length > 0
                                 ? tailorNames[memo._id]
-                                    .map(
-                                      (name) =>
-                                        name.charAt(0).toUpperCase() +
-                                        name.slice(1),
-                                    )
-                                    .join(", ")
+                                  .map(
+                                    (name) =>
+                                      name.charAt(0).toUpperCase() +
+                                      name.slice(1),
+                                  )
+                                  .join(", ")
                                 : "Tailors Assigned"}
                             </Typography>
                           ) : (

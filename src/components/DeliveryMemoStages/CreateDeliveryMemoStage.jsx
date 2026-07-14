@@ -233,7 +233,7 @@ const CreateDeliveryMemoStage = () => {
                           color: "#6b7280",
                         }}
                       >
-                        {moment.utc(memo.createdAt).format("DD/MM/YYYY HH:mm")}
+                       {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                       </Typography>
                     </Box>
 
