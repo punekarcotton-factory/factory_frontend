@@ -30,12 +30,12 @@ export const DELIVERY_MEMO_STAGES = {
 // Convert to array for easy mapping
 export const DELIVERY_MEMO_STAGES_ARRAY = Object.values(DELIVERY_MEMO_STAGES);
  
-  export const getMemoSubtitle = (memo) => {
-    if (memo.title && memo.title.trim() !== "") return memo.title;
-    if (memo.items?.[0]?.fabricSKU && memo.items[0].fabricSKU.trim() !== "") return memo.items[0].fabricSKU;
-    if (memo.items?.[0]?.shirtSKUs?.[0]?.sku && memo.items[0].shirtSKUs[0].sku.trim() !== "") return memo.items[0].shirtSKUs[0].sku;
-    return null;
-  };
+  // export const getMemoSubtitle = (memo) => {
+  //   if (memo.title && memo.title.trim() !== "") return memo.title;
+  //   if (memo.items?.[0]?.fabricSKU && memo.items[0].fabricSKU.trim() !== "") return memo.items[0].fabricSKU;
+  //   if (memo.items?.[0]?.shirtSKUs?.[0]?.sku && memo.items[0].shirtSKUs[0].sku.trim() !== "") return memo.items[0].shirtSKUs[0].sku;
+  //   return null;
+  // };
  
 export const getMemoTitle = (memo) => {
   if (memo.dmNumber && memo.dmNumber.trim() !== "") return memo.dmNumber;
