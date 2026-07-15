@@ -28,12 +28,14 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { resolveImageUrl } from "../../config";
 import AssignPreStitcherModal from "../../Modals/AssignPreStitcherModal";
 import DamageModal from "../../Modals/DamageModal";
 import ImagePreviewModal from "../../Modals/ImagePreviewModal";
 import MemoDetailDrawer from "../../Modals/MemoDetailDrawer";
+import PreStitcherAssignmentsDrawer from "../../components/PreStitcherAssignmentsDrawer";
 import { showSnackbar } from "../../Slice/snackbarSlice";
 import axiosInstance from "../../utils/axiosInstance";
 import { useDamage } from "../hooks/useDamage";
@@ -47,16 +49,43 @@ import moment from "moment";
 const PreStitcherStage = () => {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
+  const location = useLocation();
 
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      return location.state.activeTab;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [activeMemoId, setActiveMemoId] = useState(null);
   const [options, setOptions] = useState([]);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [selectedMemoForDetails, setSelectedMemoForDetails] = useState(null);
+
+  // Assignments drawer states
+  const [assignmentsDrawerOpen, setAssignmentsDrawerOpen] = useState(false);
+  const [selectedMemoForAssignments, setSelectedMemoForAssignments] =
+    useState(null);
+
+  const openAssignmentsDrawer = (memo) => {
+    setSelectedMemoForAssignments(memo);
+    setAssignmentsDrawerOpen(true);
+  };
+
+  const closeAssignmentsDrawer = () => {
+    setAssignmentsDrawerOpen(false);
+    setSelectedMemoForAssignments(null);
+  };
 
   const fetchPreStitchMemos = async () => {
     try {
@@ -225,6 +254,38 @@ const PreStitcherStage = () => {
     }
   };
 
+  const handleMarkComplete = async (memoId) => {
+    try {
+      await axiosInstance.post(
+        `/pre-stitchers/memos/${memoId}/admin-complete`,
+        {
+          performedBy: user?._id || user?.id,
+        },
+      );
+
+      dispatch(
+        showSnackbar({
+          open: true,
+          severity: "success",
+          message: "Pre-stitcher work marked as complete by Admin",
+        }),
+      );
+
+      fetchPreStitchMemos();
+    } catch (err) {
+      console.error("[handleMarkComplete] Error:", err);
+      dispatch(
+        showSnackbar({
+          open: true,
+          severity: "error",
+          message:
+            err?.response?.data?.message ||
+            "Failed to mark as complete. Please try again.",
+        }),
+      );
+    }
+  };
+
   const openAssignModal = (memoId) => {
     setActiveMemoId(memoId);
     setModalOpen(true);
@@ -319,8 +380,8 @@ const PreStitcherStage = () => {
 
   return (
     <>
-      <Box sx={{ minHeight: "100%", pb: 4, mt: 3 }}>
-        <Container maxWidth={false} disableGutters sx={{ px: 3 }}>
+      <Box sx={{ minHeight: "100%", pb: 1, mt: 1 }}>
+        <Container maxWidth={false} disableGutters sx={{ px: 1 }}>
           <Paper
             elevation={0}
             sx={{
@@ -567,9 +628,9 @@ const PreStitcherStage = () => {
                                 color: "#6b7280",
                               }}
                             >
-                              {moment
-                                .utc(memo.createdAt)
-                                .format("DD/MM/YYYY HH:mm")}
+                              {moment(memo.createdAt).format(
+                                "DD/MM/YYYY HH:mm",
+                              )}
                             </Typography>
                           </Box>
 
@@ -1028,7 +1089,7 @@ const PreStitcherStage = () => {
                                         const optionPercentage =
                                           data.total > 0
                                             ? (data.completed / data.total) *
-                                            100
+                                              100
                                             : 0;
                                         return (
                                           <Box key={idx} sx={{ mb: 1 }}>
@@ -1068,7 +1129,7 @@ const PreStitcherStage = () => {
                                                 "& .MuiLinearProgress-bar": {
                                                   backgroundColor:
                                                     data.completed ===
-                                                      data.total
+                                                    data.total
                                                       ? "#16a34a"
                                                       : "#3b82f6",
                                                 },
@@ -1122,6 +1183,38 @@ const PreStitcherStage = () => {
                               >
                                 Assign Pre-Stitcher
                               </CreateButton>
+                            )}
+
+                            {getCurrentStatus() === "assigned" && (
+                              <>
+                                <Button
+                                  variant="outlined"
+                                  fullWidth
+                                  onClick={() => openAssignmentsDrawer(memo)}
+                                  sx={{
+                                    textTransform: "none",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    height: "38px",
+                                    borderColor: "#3b82f6",
+                                    color: "#3b82f6",
+                                    "&:hover": {
+                                      borderColor: "#3b82f6",
+                                      backgroundColor:
+                                        "rgba(59, 130, 246, 0.04)",
+                                    },
+                                  }}
+                                >
+                                  Update Progress
+                                </Button>
+                                <CreateButton
+                                  variant="contained"
+                                  fullWidth
+                                  onClick={() => handleMarkComplete(memoId)}
+                                >
+                                  Mark Complete
+                                </CreateButton>
+                              </>
                             )}
 
                             {getCurrentStatus() === "completed" && (
@@ -1186,6 +1279,14 @@ const PreStitcherStage = () => {
         setNotes={setDamageNotes}
         loading={damageLoading}
         onConfirm={handleMarkDamage}
+      />
+
+      {/* Assignments Drawer */}
+      <PreStitcherAssignmentsDrawer
+        open={assignmentsDrawerOpen}
+        onClose={closeAssignmentsDrawer}
+        memo={selectedMemoForAssignments}
+        onUpdate={fetchPreStitchMemos}
       />
     </>
   );

@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import { Palette, Person, Phone, ExpandMore, Notes } from "@mui/icons-material";
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { getMemoTitle, getMemoSubtitle } from "../../utils/deliveryMemo";
 import { useSelector, useDispatch } from "react-redux";
 import AssignKanchButtonDialog from "../../Modals/AssignKanchButtonDialog";
@@ -39,13 +40,25 @@ import moment from "moment";
 const KanchButtonStage = () => {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
+  const location = useLocation();
 
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedMemoId, setSelectedMemoId] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      return location.state.activeTab;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (location.state && typeof location.state.activeTab === "number") {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   const [tailorForm, setTailorForm] = useState({
     name: "",
@@ -376,7 +389,7 @@ const KanchButtonStage = () => {
 
   return (
     <>
-      <Box sx={{ minHeight: "100%", pb: 4, mt: 3 }}>
+      <Box sx={{ minHeight: "100%", pb: 1, mt: 1 }}>
         <Container maxWidth="xl">
           {/* Tabs */}
           <Paper
@@ -600,9 +613,7 @@ const KanchButtonStage = () => {
                               color: "#6b7280",
                             }}
                           >
-                            {moment
-                              .utc(memo.createdAt)
-                              .format("DD/MM/YYYY HH:mm")}
+                          {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                           </Typography>
                         </Box>
 

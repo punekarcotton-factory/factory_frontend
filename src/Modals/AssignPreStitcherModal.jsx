@@ -13,6 +13,7 @@ import {
   WorkOutline,
 } from "@mui/icons-material";
 import {
+  Autocomplete,
   Alert,
   Avatar,
   Box,
@@ -83,9 +84,9 @@ const AssignPreStitcherModal = ({
 
   // Current assignment being added
   const [selectedPreStitcher, setSelectedPreStitcher] = useState("");
-  const [selectedOptions, setSelectedOptions] = useState([]); 
+  const [selectedOptions, setSelectedOptions] = useState([]);
   const [quantityMode, setQuantityMode] = useState("all");
-  const [customQuantity, setCustomQuantity] = useState(""); 
+  const [customQuantity, setCustomQuantity] = useState("");
 
   // Mobile UI state
   const [showProgressDetails, setShowProgressDetails] = useState(false);
@@ -209,7 +210,7 @@ const AssignPreStitcherModal = ({
       }
 
       newAssignments.push({
-        id: Date.now() + Math.random(), 
+        id: Date.now() + Math.random(),
         preStitcherId: selectedPreStitcher,
         preStitcherName: `${preStitcher.firstName} ${preStitcher.lastName}`,
         option: optionKey,
@@ -370,9 +371,9 @@ const AssignPreStitcherModal = ({
             const skuQty = isLastSku
               ? Math.min(itemSplitTarget - skuAllocated, skuObj.quantity)
               : Math.min(
-                  Math.round(skuObj.quantity * (itemSplitTarget / itemShirts)),
-                  skuObj.quantity,
-                );
+                Math.round(skuObj.quantity * (itemSplitTarget / itemShirts)),
+                skuObj.quantity,
+              );
             skuAllocated += skuQty;
             return { sku: skuObj.sku, quantity: skuQty };
           })
@@ -619,7 +620,7 @@ const AssignPreStitcherModal = ({
                     SKU Breakdown
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    {memoItems.map((item, itemIdx) => 
+                    {memoItems.map((item, itemIdx) =>
                       (item.shirtSKUs || []).map((skuObj, skuIdx) => (
                         <Chip
                           key={`${itemIdx}-${skuIdx}`}
@@ -686,48 +687,34 @@ const AssignPreStitcherModal = ({
                   Add New Assignment
                 </Typography>
 
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel id="prestitcher-select-label">Select Pre-Stitcher</InputLabel>
-                  <Select
-                    labelId="prestitcher-select-label"
-                    id="prestitcher-select"
-                    value={selectedPreStitcher}
-                    label="Select Pre-Stitcher"
-                    onChange={(e) => setSelectedPreStitcher(e.target.value)}
-                    size={isSmallMobile ? "small" : "medium"}
-                  >
-                    {preStitchers.map((ps) => (
-                      <MenuItem key={ps._id} value={ps._id}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                          }}
-                        >
-                          <Avatar
-                            sx={{
-                              width: 28,
-                              height: 28,
-                              fontSize: 12,
-                              backgroundColor: "#667eea",
-                            }}
-                          >
-                            {ps.firstName.charAt(0)}
-                          </Avatar>
-                          <Typography
-                            sx={{
-                              fontWeight: 500,
-                              fontSize: { xs: 13, sm: 14 },
-                            }}
-                          >
-                            {ps.firstName} {ps.lastName}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  options={preStitchers}
+                  getOptionLabel={(ps) => `${ps.firstName} ${ps.lastName}` || ""}
+                  filterOptions={(options, { inputValue }) =>
+                    options.filter((ps) =>
+                      `${ps.firstName} ${ps.lastName}`.toLowerCase().includes(inputValue.toLowerCase())
+                    )
+                  }
+                  value={preStitchers.find((ps) => ps._id === selectedPreStitcher) || null}
+                  onChange={(_, newValue) => setSelectedPreStitcher(newValue?._id || "")}
+                  size={isSmallMobile ? "small" : "medium"}
+                  sx={{ mb: 2 }}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Select Pre-Stitcher" />
+                  )}
+                  renderOption={(props, ps) => (
+                    <Box component="li" {...props} key={ps._id}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Avatar sx={{ width: 28, height: 28, fontSize: 12, backgroundColor: "#667eea" }}>
+                          {ps.firstName.charAt(0)}
+                        </Avatar>
+                        <Typography sx={{ fontWeight: 500, fontSize: { xs: 13, sm: 14 } }}>
+                          {ps.firstName} {ps.lastName}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                />
 
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel id="pre-ops-select-label">Select Operations (Multiple)</InputLabel>
