@@ -18,7 +18,6 @@ import { useSelector, useDispatch } from "react-redux";
 import { useLocation } from "react-router-dom";
 import moment from "moment";
 import axiosInstance from "../../utils/axiosInstance";
-import { useLocation } from "react-router-dom";
 import { getMemoTitle } from "../../utils/deliveryMemo";
 import { CreateButton } from "../Styled";
 import NoResponsePage from "../../pages/NoResponsePage";

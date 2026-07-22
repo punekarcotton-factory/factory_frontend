@@ -71,7 +71,7 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
     setSelectedFabric(null);
     setFabricGiven("");
     setNotes("");
-    setDmNumber(generateDmNumber());
+    setDmNumber("");
 
     const fetchFabrics = async () => {
       setLoadingFabrics(true);
