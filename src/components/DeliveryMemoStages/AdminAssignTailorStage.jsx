@@ -1,4 +1,4 @@
-import {
+​import {
   Badge,
   Box,
   Button,
@@ -564,7 +564,7 @@ const AdminAssignTailorStage = () => {
                             }}
                           >
                             <Tooltip
-                              title={getMemoTitle(memo)}
+                              title={memo.dmNumber || memoDmNumbers[memo._id] || ""}
                               arrow
                               placement="top"
                             >
