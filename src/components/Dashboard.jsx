@@ -9,6 +9,7 @@ import {
   Straighten,
   History,
   Inventory2Outlined,
+  Work,
 } from "@mui/icons-material";
 import {
   Box,
@@ -26,6 +27,7 @@ import KanchButtonHistory from "../Modals/KanchButtonHistory";
 import LinkFabricShirtModal from "../Modals/LinkFabricShirtModal";
 import ClosedDeliveryMemoHistory from "../Modals/ClosedDeliveryMemoHistory";
 import FabricReportHistory from "../Modals/FabricReportHistory";
+import JobWorkHistory from "../Modals/JobWorkHistory";
 import { useEffect, useState } from "react";
 import CuttingHistory from "../Modals/Cuttinghistory";
 import { useLoading } from "./hooks/useLoading";
@@ -39,6 +41,7 @@ export default function Dashboard() {
     PRESTITCHER: { active: 0, completed: 0 },
     TAILOR: { active: 0, completed: 0 },
     KANCH_BUTTON: { active: 0, completed: 0 },
+    JOB_WORK: { active: 0, completed: 0 },
   });
   const [loadingStats, setLoadingStats] = useState(false);
 
@@ -100,6 +103,14 @@ export default function Dashboard() {
       completed: stats["KANCH_BUTTON"]?.completed || 0,
     },
     {
+      id: "jobwork-summary",
+      title: "Job Work Summary",
+      description: "View Job Work history, assigned workers and fabric given",
+      icon: Work,
+      active: stats["JOB_WORK"]?.active || 0,
+      completed: stats["JOB_WORK"]?.completed || 0,
+    },
+    {
       id: "History",
       title: "History",
       description: "View all history of reports",
@@ -158,6 +169,7 @@ export default function Dashboard() {
           {selectedReport === "prestitcher-summary" && <PrestitcherHistory />}
           {selectedReport === "tailor-summary" && <TailorHistory />}
           {selectedReport === "kanchButton-Summary" && <KanchButtonHistory />}
+          {selectedReport === "jobwork-summary" && <JobWorkHistory />}
           {selectedReport === "History" && <ClosedDeliveryMemoHistory />}
           {selectedReport === "fabric-reports" && <FabricReportHistory />}
         </Box>

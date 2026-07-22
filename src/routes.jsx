@@ -12,6 +12,7 @@ import PreStitcherStage from "./components/DeliveryMemoStages/PreStitcherStage";
 import ReturnFabricManagement from "./components/ReturnFabricManagement";
 import AdminAssignTailorStage from "./components/DeliveryMemoStages/AdminAssignTailorStage";
 import KanchButtonStage from "./components/DeliveryMemoStages/KanchButtonStage";
+import JobWorkStage from "./components/DeliveryMemoStages/JobWorkStage";
 
 const routes = [
   {
@@ -64,7 +65,11 @@ const routes = [
         path: "/delivery-memo/kanch-button",
         element: <KanchButtonStage />,
       },
-        {
+      {
+        path: "/delivery-memo/job-work",
+        element: <JobWorkStage />,
+      },
+      {
         path: "/returns",
         element: <ReturnFabricManagement />,
       },

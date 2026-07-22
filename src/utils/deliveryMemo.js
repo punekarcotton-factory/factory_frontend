@@ -24,7 +24,11 @@ export const DELIVERY_MEMO_STAGES = {
     label: "Kanch Button",
     key: "KANCH_BUTTON",
   },
- 
+  JOB_WORK: {
+    id: 6,
+    label: "Job Work",
+    key: "JOB_WORK",
+  },
 };
  
 // Convert to array for easy mapping

@@ -1,15 +1,40 @@
 import { Box } from "@mui/material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import DeliveryMemoSidebar from "./Sidebar/DeliverMemoSidebar";
-import { DELIVERY_MEMO_STAGES } from "../utils/deliveryMemo";
+import { DELIVERY_MEMO_STAGES, DELIVERY_MEMO_STAGES_ARRAY } from "../utils/deliveryMemo";
 import CreateDeliveryMemoStage from "./DeliveryMemoStages/CreateDeliveryMemoStage";
 import CuttingStage from "./DeliveryMemoStages/CuttingStage";
 import PreStitcherStage from "./DeliveryMemoStages/PreStitcherStage";
+import JobWorkStage from "./DeliveryMemoStages/JobWorkStage";
+
+const getStageFromPath = (path) => {
+  const matchedStage = DELIVERY_MEMO_STAGES_ARRAY.find((s) => {
+    const stageRoute = `/delivery-memo/${s.key.toLowerCase().replace(/_/g, "-")}`;
+    return path === stageRoute || path === stageRoute + "/";
+  });
+  return matchedStage ? matchedStage.key : DELIVERY_MEMO_STAGES.CREATE_DELIVERY_MEMO.key;
+};
 
 const DeliveryMemo = () => {
-  const [activeStage, setActiveStage] = useState(
-    DELIVERY_MEMO_STAGES.CREATE_DELIVERY_MEMO.key
-  );
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [activeStage, setActiveStage] = useState(() => getStageFromPath(location.pathname));
+
+  useEffect(() => {
+    const stageFromUrl = getStageFromPath(location.pathname);
+    setActiveStage(stageFromUrl);
+  }, [location.pathname]);
+
+  const handleStageChange = (stageKey) => {
+    setActiveStage(stageKey);
+    const stageObj = Object.values(DELIVERY_MEMO_STAGES).find((s) => s.key === stageKey);
+    if (stageObj) {
+      const targetRoute = `/delivery-memo/${stageObj.key.toLowerCase().replace(/_/g, "-")}`;
+      navigate(targetRoute);
+    }
+  };
 
   const renderStageContent = () => {
     switch (activeStage) {
@@ -23,6 +48,8 @@ const DeliveryMemo = () => {
         return <Box>Admin Assign Tailor Stage - Coming Soon</Box>;
       case DELIVERY_MEMO_STAGES.KANCH_BUTTON.key:
         return <Box>Kanch Button Stage - Coming Soon</Box>;
+      case DELIVERY_MEMO_STAGES.JOB_WORK.key:
+        return <JobWorkStage />;
       case DELIVERY_MEMO_STAGES.FINAL_INSPECTION.key:
         return <Box>Final Inspection Stage - Coming Soon</Box>;
       default:
@@ -40,12 +67,10 @@ const DeliveryMemo = () => {
         overflow: "hidden",
       }}
     >
-
       <DeliveryMemoSidebar
         activeStage={activeStage}
-        onStageChange={setActiveStage}
+        onStageChange={handleStageChange}
       />
-
 
       <Box
         sx={{
