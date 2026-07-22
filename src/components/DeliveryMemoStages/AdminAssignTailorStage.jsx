@@ -21,7 +21,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Palette, ExpandMore, Notes } from "@mui/icons-material";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import AssignMultipleTailorsModal from "../../Modals/AssignMultipleTailorsModal";
@@ -52,9 +52,16 @@ const AdminAssignTailorStage = () => {
     return 0;
   });
 
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || ""
+  );
+
   useEffect(() => {
     if (location.state && typeof location.state.activeTab === "number") {
       setActiveTab(location.state.activeTab);
+    }
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
     }
   }, [location.state]);
 
@@ -337,6 +344,36 @@ const AdminAssignTailorStage = () => {
     }
   };
 
+  useEffect(() => {
+    if (searchDmNumber && memos.length > 0) {
+      const q = searchDmNumber.trim().toLowerCase();
+      const matched = memos.find((m) => {
+        const dm1 = (m.dmNumber || "").toLowerCase();
+        const dm2 = (memoDmNumbers[m._id] || "").toLowerCase();
+        const id1 = (m.deliveryMemoId || "").toLowerCase();
+        const id2 = (m._id || "").toLowerCase();
+        return dm1.includes(q) || dm2.includes(q) || id1.includes(q) || id2.includes(q);
+      });
+      if (matched) {
+        if (matched.tailorAssignmentStatus === "COMPLETED") setActiveTab(2);
+        else if (matched.tailorAssignmentStatus === "ASSIGNED") setActiveTab(1);
+        else setActiveTab(0);
+      }
+    }
+  }, [searchDmNumber, memos, memoDmNumbers]);
+
+  const displayedMemos = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return getCurrentMemos();
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter((m) => {
+      const dm1 = (m.dmNumber || "").toLowerCase();
+      const dm2 = (memoDmNumbers[m._id] || "").toLowerCase();
+      const id1 = (m.deliveryMemoId || "").toLowerCase();
+      const id2 = (m._id || "").toLowerCase();
+      return dm1.includes(q) || dm2.includes(q) || id1.includes(q) || id2.includes(q);
+    });
+  }, [memos, memoDmNumbers, searchDmNumber, activeTab, groupedMemos]);
+
   if (loading) {
     return (
       <Box sx={{ backgroundColor: "#fafbfc", minHeight: "100vh", py: 4 }}>
@@ -401,8 +438,14 @@ const AdminAssignTailorStage = () => {
               top: 0,
               zIndex: 10,
               backgroundColor: "#ffffff",
-              mb: 1,
+              mb: 2.5,
               borderBottom: "1px solid #e3e8ee",
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between",
+              alignItems: { xs: "stretch", sm: "center" },
+              gap: 2,
+              pr: { xs: 0, sm: 1 },
             }}
           >
             <Tabs
@@ -452,13 +495,13 @@ const AdminAssignTailorStage = () => {
               <Tab
                 label={
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <span>In Progress</span>
+                    <span>In Process</span>
                     <Badge
                       badgeContent={groupedMemos.assigned.length}
                       sx={{
                         "& .MuiBadge-badge": {
-                          backgroundColor: "#e3f2fd",
-                          color: "#1565c0",
+                          backgroundColor: "#e0f2fe",
+                          color: "#0369a1",
                           fontWeight: 700,
                           minWidth: 20,
                           height: 20,
@@ -492,9 +535,58 @@ const AdminAssignTailorStage = () => {
             </Tabs>
           </Paper>
 
+          {searchDmNumber && (
+            <Box
+              sx={{
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: "#eef2ff",
+                p: 1.5,
+                px: 2,
+                borderRadius: "10px",
+                border: "1px solid #c7d2fe",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Chip
+                  label={`DM Search Filter: "${searchDmNumber}"`}
+                  color="primary"
+                  size="small"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+                  Showing only matched Delivery Memo on Admin Assign Tailor stage
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  setSearchDmNumber("");
+                  try {
+                    window.history.replaceState({}, document.title);
+                  } catch (e) {}
+                }}
+                sx={{
+                  textTransform: "none",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  borderColor: "#6366f1",
+                  color: "#4338ca",
+                  backgroundColor: "#ffffff",
+                  "&:hover": { backgroundColor: "#f5f3ff" },
+                }}
+              >
+                Show All Stage Memos
+              </Button>
+            </Box>
+          )}
+
           {/* ✅ FIX: Wrapped in Grid container so cards lay out horizontally */}
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {getCurrentMemos().length === 0 ? (
+            {displayedMemos.length === 0 ? (
               <Box
                 sx={{
                   width: "100%",
@@ -507,7 +599,7 @@ const AdminAssignTailorStage = () => {
                 <NoResponsePage />
               </Box>
             ) : (
-              getCurrentMemos().map((memo) => {
+              displayedMemos.map((memo) => {
                 const firstItem = memo.items?.[0];
                 const hasMultipleItems = memo.items?.length > 1;
                 const uniqueColors = [
