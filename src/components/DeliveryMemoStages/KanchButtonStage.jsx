@@ -21,7 +21,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Palette, Person, Phone, ExpandMore, Notes } from "@mui/icons-material";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { getMemoTitle, getMemoSubtitle } from "../../utils/deliveryMemo";
 import { useSelector, useDispatch } from "react-redux";
@@ -54,9 +54,16 @@ const KanchButtonStage = () => {
     return 0;
   });
 
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || ""
+  );
+
   useEffect(() => {
     if (location.state && typeof location.state.activeTab === "number") {
       setActiveTab(location.state.activeTab);
+    }
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
     }
   }, [location.state]);
 
@@ -346,6 +353,32 @@ const KanchButtonStage = () => {
     }
   };
 
+  useEffect(() => {
+    if (searchDmNumber && memos.length > 0) {
+      const q = searchDmNumber.trim().toLowerCase();
+      const matched = memos.find((m) => {
+        const dm = (m.dmNumber || "").toLowerCase();
+        const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+        return dm === q || id === q || dm.includes(q) || id.includes(q);
+      });
+      if (matched) {
+        if (matched.kanchButtonAssignmentStatus === "COMPLETED") setActiveTab(2);
+        else if (matched.kanchButtonAssigned || matched.kanchButtonAssignmentStatus === "ASSIGNED") setActiveTab(1);
+        else setActiveTab(0);
+      }
+    }
+  }, [searchDmNumber, memos]);
+
+  const displayedKanchMemos = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return getCurrentMemos();
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter((m) => {
+      const dm = (m.dmNumber || "").toLowerCase();
+      const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+      return dm === q || id === q || dm.includes(q) || id.includes(q);
+    });
+  }, [memos, searchDmNumber, activeTab, groupedMemos]);
+
   if (loading) {
     return (
       <Box sx={{ backgroundColor: "#fafbfc", minHeight: "100vh", py: 4 }}>
@@ -417,7 +450,9 @@ const KanchButtonStage = () => {
                   minHeight: 56,
                   color: "#697386",
                   px: 3,
-                  "&.Mui-selected": { color: "#1a1f36" },
+                  "&.Mui-selected": {
+                    color: "#1a1f36",
+                  },
                 },
                 "& .MuiTabs-indicator": {
                   backgroundColor: "#667eea",
@@ -488,12 +523,61 @@ const KanchButtonStage = () => {
             </Tabs>
           </Paper>
 
+          {searchDmNumber && (
+            <Box
+              sx={{
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: "#eef2ff",
+                p: 1.5,
+                px: 2,
+                borderRadius: "10px",
+                border: "1px solid #c7d2fe",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Chip
+                  label={`DM Search Filter: "${searchDmNumber}"`}
+                  color="primary"
+                  size="small"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+                  Showing only matched Delivery Memo on Kanch Button stage
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  setSearchDmNumber("");
+                  try {
+                    window.history.replaceState({}, document.title);
+                  } catch (e) {}
+                }}
+                sx={{
+                  textTransform: "none",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  borderColor: "#6366f1",
+                  color: "#4338ca",
+                  backgroundColor: "#ffffff",
+                  "&:hover": { backgroundColor: "#f5f3ff" },
+                }}
+              >
+                Show All Stage Memos
+              </Button>
+            </Box>
+          )}
+
           {/* Content */}
-          {getCurrentMemos().length === 0 ? (
+          {displayedKanchMemos.length === 0 ? (
             <NoResponsePage />
           ) : (
             <Grid container spacing={2.5} mt={2}>
-              {getCurrentMemos().map((memo) => {
+              {displayedKanchMemos.map((memo) => {
                 const itemCount = memo.items?.length || 0;
                 const uniqueColors = [
                   ...new Set(memo.items?.map((item) => item.fabricColor) || []),

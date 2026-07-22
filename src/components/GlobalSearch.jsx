@@ -66,6 +66,9 @@ const GlobalSearch = () => {
     if (stageCaps.includes("CUTTING")) {
       return "/delivery-memo/cutting";
     }
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      return "/delivery-memo/job-work";
+    }
     if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
       return "/delivery-memo/assign-pre-stitcher";
     }
@@ -81,9 +84,56 @@ const GlobalSearch = () => {
     return `/delivery-memo/${stage.toLowerCase().replace(/_/g, "-")}`;
   };
 
+  const getSubStageChip = (memo) => {
+    if (!memo.stage) return null;
+    const stageCaps = memo.stage.toUpperCase();
+
+    // 1. Job Work
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      const status = memo.jobWorkStatus || "PENDING";
+      if (status === "IN_PROCESS" && (memo.jobWorkWorkerName || memo.jobWorkWorkerId)) {
+        return { label: "In Process", color: "#1e40af", bg: "#dbeafe" };
+      }
+      return { label: "Pending Assignment", color: "#92400e", bg: "#fef3c7" };
+    }
+
+    // 2. Pre-Stitcher
+    if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
+      if (stageCaps === "PRE_STITCHER_COMPLETED") return { label: "Completed", color: "#065f46", bg: "#d1fae5" };
+      if (stageCaps === "PRE_STITCHER_ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    // 3. Admin Assign Tailor
+    if (stageCaps.includes("TAILOR") || stageCaps.includes("ASSIGN_TAILOR")) {
+      const status = memo.tailorAssignmentStatus || "";
+      if (status === "COMPLETED") return { label: "Completed", color: "#2e7d32", bg: "#e8f5e9" };
+      if (status === "ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    // 4. Kanch Button
+    if (stageCaps.includes("KANCH_BUTTON") || stageCaps.includes("KANCH")) {
+      const status = memo.kanchButtonAssignmentStatus || "";
+      const assigned = memo.kanchButtonAssigned;
+      if (status === "COMPLETED") return { label: "Completed", color: "#2e7d32", bg: "#e8f5e9" };
+      if (assigned || status === "ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    return null;
+  };
+
   const getStageTab = (memo) => {
     if (!memo.stage) return 0;
     const stageCaps = memo.stage.toUpperCase();
+
+    // 0. Job Work
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      const status = memo.jobWorkStatus || "";
+      if (status === "IN_PROCESS" && (memo.jobWorkWorkerName || memo.jobWorkWorkerId)) return 1;
+      return 0;
+    }
 
     // 1. Pre-Stitcher
     if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
@@ -118,13 +168,22 @@ const GlobalSearch = () => {
     const route = getStageRoute(memo.stage);
     const tabIndex = getStageTab(memo);
     setOpen(false);
-    navigate(route, { state: { activeTab: tabIndex } });
+    navigate(route, {
+      state: {
+        activeTab: tabIndex,
+        searchDmNumber: memo.dmNumber || memo.deliveryMemoId,
+      },
+    });
   };
 
   const handleResultClick = (memo) => {
-    setSelectedMemo(memo);
-    setModalOpen(true);
-    setOpen(false);
+    if (memo.stage) {
+      handleGoToStage(memo);
+    } else {
+      setSelectedMemo(memo);
+      setModalOpen(true);
+      setOpen(false);
+    }
   };
 
   const clearSearch = () => {
@@ -255,6 +314,24 @@ const GlobalSearch = () => {
                               sx={{ fontSize: "10px", height: "18px" }}
                             />
                           )}
+                          {(() => {
+                            const subChip = getSubStageChip(memo);
+                            if (!subChip) return null;
+                            return (
+                              <Chip
+                                label={subChip.label}
+                                size="small"
+                                sx={{
+                                  fontSize: "10px",
+                                  height: "18px",
+                                  fontWeight: 600,
+                                  bgcolor: subChip.bg,
+                                  color: subChip.color,
+                                  border: `1px solid ${subChip.color}44`,
+                                }}
+                              />
+                            );
+                          })()}
                           {memo.status === "CLOSED" && (
                             <Chip
                               label="Closed"
