@@ -17,6 +17,7 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { useSelector, useDispatch } from "react-redux";
 import moment from "moment";
 import axiosInstance from "../../utils/axiosInstance";
+import { useLocation } from "react-router-dom";
 import { getMemoTitle } from "../../utils/deliveryMemo";
 import { CreateButton } from "../Styled";
 import NoResponsePage from "../../pages/NoResponsePage";
@@ -28,12 +29,23 @@ import { useLoading } from "../hooks/useLoading";
 
 const JobWorkStage = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { user } = useSelector((state) => state.auth);
   const { setLoading: setGlobalLoading } = useLoading();
 
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || "",
+  );
+
+  useEffect(() => {
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
+    }
+  }, [location.state]);
+
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(0); 
+  const [activeTab, setActiveTab] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [assignDialog, setAssignDialog] = useState({ open: false, memo: null });
   const [detailDrawer, setDetailDrawer] = useState({ open: false, memo: null });
@@ -47,7 +59,7 @@ const JobWorkStage = () => {
         params: { stage: "JOB_WORK" },
       });
       const sorted = (response.data?.data || []).sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
       );
       setMemos(sorted);
     } catch (error) {
@@ -83,7 +95,7 @@ const JobWorkStage = () => {
             newStatus === "COMPLETED"
               ? "Memo marked as Completed & Closed!"
               : `Status updated to ${newStatus.replace("_", " ")}`,
-        })
+        }),
       );
 
       await fetchJobWorkMemos();
@@ -94,7 +106,7 @@ const JobWorkStage = () => {
           open: true,
           severity: "error",
           message: error.response?.data?.message || "Failed to update status",
-        })
+        }),
       );
     } finally {
       setUpdatingId(null);
@@ -105,14 +117,16 @@ const JobWorkStage = () => {
   const groupedMemos = useMemo(() => {
     const pending = memos.filter(
       (m) =>
-        (!m.jobWorkWorkerName || m.jobWorkStatus === "PENDING" || !m.jobWorkStatus) &&
-        m.status !== "CLOSED"
+        (!m.jobWorkWorkerName ||
+          m.jobWorkStatus === "PENDING" ||
+          !m.jobWorkStatus) &&
+        m.status !== "CLOSED",
     );
     const inProcess = memos.filter(
       (m) =>
         Boolean(m.jobWorkWorkerName || m.jobWorkWorkerId) &&
         m.jobWorkStatus === "IN_PROCESS" &&
-        m.status !== "CLOSED"
+        m.status !== "CLOSED",
     );
 
     return { pending, inProcess };
@@ -136,20 +150,71 @@ const JobWorkStage = () => {
     if (isClosed || status === "COMPLETED") {
       return {
         label: "Completed",
-        sx: { backgroundColor: "#d1fae5", color: "#065f46", fontWeight: 600, fontSize: "11px", height: "22px" },
+        sx: {
+          backgroundColor: "#d1fae5",
+          color: "#065f46",
+          fontWeight: 600,
+          fontSize: "11px",
+          height: "22px",
+        },
       };
     }
     if (status === "IN_PROCESS") {
       return {
         label: "In Process",
-        sx: { backgroundColor: "#dbeafe", color: "#1e40af", fontWeight: 600, fontSize: "11px", height: "22px" },
+        sx: {
+          backgroundColor: "#dbeafe",
+          color: "#1e40af",
+          fontWeight: 600,
+          fontSize: "11px",
+          height: "22px",
+        },
       };
     }
     return {
       label: "Unassigned",
-      sx: { backgroundColor: "#fef3c7", color: "#92400e", fontWeight: 600, fontSize: "11px", height: "22px" },
+      sx: {
+        backgroundColor: "#fef3c7",
+        color: "#92400e",
+        fontWeight: 600,
+        fontSize: "11px",
+        height: "22px",
+      },
     };
   };
+
+  useEffect(() => {
+    if (searchDmNumber && memos.length > 0) {
+      const q = searchDmNumber.trim().toLowerCase();
+      const matched = memos.find((m) => {
+        const dm = (m.dmNumber || "").toLowerCase();
+        const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+        return dm === q || id === q || dm.includes(q) || id.includes(q);
+      });
+      if (matched) {
+        if (
+          matched.jobWorkStatus === "IN_PROCESS" &&
+          (matched.jobWorkWorkerName || matched.jobWorkWorkerId)
+        ) {
+          setActiveTab(1);
+        } else {
+          setActiveTab(0);
+        }
+      }
+    }
+  }, [searchDmNumber, memos]);
+
+  const currentMemosList = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return getCurrentMemos();
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter((m) => {
+      const dm = (m.dmNumber || "").toLowerCase();
+      const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+      return dm === q || id === q || dm.includes(q) || id.includes(q);
+    });
+  }, [memos, searchDmNumber, activeTab, groupedMemos]);
+
+  const currentMemosList = getCurrentMemos();
 
   if (loading) {
     return (
@@ -191,10 +256,58 @@ const JobWorkStage = () => {
     );
   }
 
-  const currentMemosList = getCurrentMemos();
-
   return (
     <Box sx={{ p: 2 }}>
+      {/* Search Filter Active Banner */}
+      {searchDmNumber && (
+        <Box
+          sx={{
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: "#eef2ff",
+            p: 1.5,
+            px: 2,
+            borderRadius: "10px",
+            border: "1px solid #c7d2fe",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Chip
+              label={`DM Search Filter: "${searchDmNumber}"`}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+            <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+              Showing only matched Delivery Memo on this stage
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchDmNumber("");
+              try {
+                window.history.replaceState({}, document.title);
+              } catch (e) {}
+            }}
+            sx={{
+              textTransform: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              borderColor: "#6366f1",
+              color: "#4338ca",
+              backgroundColor: "#ffffff",
+              "&:hover": { backgroundColor: "#f5f3ff" },
+            }}
+          >
+            Show All Stage Memos
+          </Button>
+        </Box>
+      )}
+
       {/* Sub Stages Navigation Paper */}
       <Paper
         elevation={0}
@@ -295,7 +408,8 @@ const JobWorkStage = () => {
         <Grid container spacing={2.5}>
           {currentMemosList.map((memo) => {
             const chipProps = getStatusChipProps(memo);
-            const fabricSKU = memo.fabricSKU || memo.items?.[0]?.fabricSKU || "N/A";
+            const fabricSKU =
+              memo.fabricSKU || memo.items?.[0]?.fabricSKU || "N/A";
             const fabricGiven = memo.fabricGiven || memo.totalDhapFold || 0;
 
             return (
@@ -401,8 +515,12 @@ const JobWorkStage = () => {
                           sx={{
                             fontSize: "13px",
                             fontWeight: 600,
-                            color: memo.jobWorkWorkerName ? "#111827" : "#9ca3af",
-                            fontStyle: memo.jobWorkWorkerName ? "normal" : "italic",
+                            color: memo.jobWorkWorkerName
+                              ? "#111827"
+                              : "#9ca3af",
+                            fontStyle: memo.jobWorkWorkerName
+                              ? "normal"
+                              : "italic",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -501,12 +619,16 @@ const JobWorkStage = () => {
                           variant="contained"
                           fullWidth
                           disabled={updatingId === memo.deliveryMemoId}
-                          onClick={() => handleUpdateStatus(memo.deliveryMemoId, "COMPLETED")}
+                          onClick={() =>
+                            handleUpdateStatus(memo.deliveryMemoId, "COMPLETED")
+                          }
                           sx={{
                             height: "36px",
                             fontSize: "12px",
                             backgroundColor: "#059669 !important",
-                            "&:hover": { backgroundColor: "#047857 !important" },
+                            "&:hover": {
+                              backgroundColor: "#047857 !important",
+                            },
                           }}
                         >
                           Complete & Close
