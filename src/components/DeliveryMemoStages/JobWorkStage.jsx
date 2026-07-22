@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { useSelector, useDispatch } from "react-redux";
+import { useLocation } from "react-router-dom";
 import moment from "moment";
 import axiosInstance from "../../utils/axiosInstance";
 import { getMemoTitle } from "../../utils/deliveryMemo";
@@ -28,8 +29,19 @@ import { useLoading } from "../hooks/useLoading";
 
 const JobWorkStage = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { user } = useSelector((state) => state.auth);
   const { setLoading: setGlobalLoading } = useLoading();
+
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || ""
+  );
+
+  useEffect(() => {
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
+    }
+  }, [location.state]);
 
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +163,34 @@ const JobWorkStage = () => {
     };
   };
 
+  useEffect(() => {
+    if (searchDmNumber && memos.length > 0) {
+      const q = searchDmNumber.trim().toLowerCase();
+      const matched = memos.find((m) => {
+        const dm = (m.dmNumber || "").toLowerCase();
+        const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+        return dm === q || id === q || dm.includes(q) || id.includes(q);
+      });
+      if (matched) {
+        if (matched.jobWorkStatus === "IN_PROCESS" && (matched.jobWorkWorkerName || matched.jobWorkWorkerId)) {
+          setActiveTab(1);
+        } else {
+          setActiveTab(0);
+        }
+      }
+    }
+  }, [searchDmNumber, memos]);
+
+  const currentMemosList = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return getCurrentMemos();
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter((m) => {
+      const dm = (m.dmNumber || "").toLowerCase();
+      const id = (m.deliveryMemoId || m._id || "").toLowerCase();
+      return dm === q || id === q || dm.includes(q) || id.includes(q);
+    });
+  }, [memos, searchDmNumber, activeTab, groupedMemos]);
+
   if (loading) {
     return (
       <Box sx={{ p: 2 }}>
@@ -191,10 +231,58 @@ const JobWorkStage = () => {
     );
   }
 
-  const currentMemosList = getCurrentMemos();
-
   return (
     <Box sx={{ p: 2 }}>
+      {/* Search Filter Active Banner */}
+      {searchDmNumber && (
+        <Box
+          sx={{
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: "#eef2ff",
+            p: 1.5,
+            px: 2,
+            borderRadius: "10px",
+            border: "1px solid #c7d2fe",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Chip
+              label={`DM Search Filter: "${searchDmNumber}"`}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+            <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+              Showing only matched Delivery Memo on this stage
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchDmNumber("");
+              try {
+                window.history.replaceState({}, document.title);
+              } catch (e) {}
+            }}
+            sx={{
+              textTransform: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              borderColor: "#6366f1",
+              color: "#4338ca",
+              backgroundColor: "#ffffff",
+              "&:hover": { backgroundColor: "#f5f3ff" },
+            }}
+          >
+            Show All Stage Memos
+          </Button>
+        </Box>
+      )}
+
       {/* Sub Stages Navigation Paper */}
       <Paper
         elevation={0}
