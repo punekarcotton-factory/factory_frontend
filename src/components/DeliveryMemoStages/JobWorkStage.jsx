@@ -214,7 +214,7 @@ const JobWorkStage = () => {
     });
   }, [memos, searchDmNumber, activeTab, groupedMemos]);
 
-  const currentMemosList = getCurrentMemos();
+  // const currentMemosList = getCurrentMemos();
 
   if (loading) {
     return (
