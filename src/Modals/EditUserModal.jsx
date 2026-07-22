@@ -79,7 +79,10 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
     try {
       const response = await axiosInstance.get('/roles')
       const rolesData = response.data?.data || response.data || []
-      setRoles(rolesData)
+      const filteredRoles = rolesData.filter(
+        r => r.roleName?.toLowerCase() !== 'job work' && r.roleName?.toLowerCase() !== 'jobwork'
+      )
+      setRoles(filteredRoles)
     } catch (err) {
       console.error('Error fetching roles:', err)
     }
