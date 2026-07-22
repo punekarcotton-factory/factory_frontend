@@ -62,36 +62,128 @@ const GlobalSearch = () => {
 
   const getStageRoute = (stage) => {
     if (!stage) return "";
-    const stageCaps  = stage.toUpperCase();
-    if (stageCaps .includes("CUTTING")) {
+    const stageCaps = stage.toUpperCase();
+    if (stageCaps.includes("CUTTING")) {
       return "/delivery-memo/cutting";
     }
-    if (stageCaps .includes("PRE_STITCHER") || stageCaps .includes("ASSIGN_PRE_STITCHER")) {
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      return "/delivery-memo/job-work";
+    }
+    if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
       return "/delivery-memo/assign-pre-stitcher";
     }
-    if (stageCaps .includes("TAILOR") || stageCaps .includes("ASSIGN_TAILOR")) {
+    if (stageCaps.includes("TAILOR") || stageCaps.includes("ASSIGN_TAILOR")) {
       return "/delivery-memo/admin-assign-tailor";
     }
-    if (stageCaps .includes("KANCH_BUTTON") || stageCaps .includes("KANCH")) {
+    if (stageCaps.includes("KANCH_BUTTON") || stageCaps.includes("KANCH")) {
       return "/delivery-memo/kanch-button";
     }
-    if (stageCaps .includes("CREATE_DELIVERY_MEMO")) {
+    if (stageCaps.includes("CREATE_DELIVERY_MEMO")) {
       return "/delivery-memo/create-delivery-memo";
     }
     return `/delivery-memo/${stage.toLowerCase().replace(/_/g, "-")}`;
   };
 
+  const getSubStageChip = (memo) => {
+    if (!memo.stage) return null;
+    const stageCaps = memo.stage.toUpperCase();
+
+    // 1. Job Work
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      const status = memo.jobWorkStatus || "PENDING";
+      if (status === "IN_PROCESS" && (memo.jobWorkWorkerName || memo.jobWorkWorkerId)) {
+        return { label: "In Process", color: "#1e40af", bg: "#dbeafe" };
+      }
+      return { label: "Pending Assignment", color: "#92400e", bg: "#fef3c7" };
+    }
+
+    // 2. Pre-Stitcher
+    if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
+      if (stageCaps === "PRE_STITCHER_COMPLETED") return { label: "Completed", color: "#065f46", bg: "#d1fae5" };
+      if (stageCaps === "PRE_STITCHER_ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    // 3. Admin Assign Tailor
+    if (stageCaps.includes("TAILOR") || stageCaps.includes("ASSIGN_TAILOR")) {
+      const status = memo.tailorAssignmentStatus || "";
+      if (status === "COMPLETED") return { label: "Completed", color: "#2e7d32", bg: "#e8f5e9" };
+      if (status === "ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    // 4. Kanch Button
+    if (stageCaps.includes("KANCH_BUTTON") || stageCaps.includes("KANCH")) {
+      const status = memo.kanchButtonAssignmentStatus || "";
+      const assigned = memo.kanchButtonAssigned;
+      if (status === "COMPLETED") return { label: "Completed", color: "#2e7d32", bg: "#e8f5e9" };
+      if (assigned || status === "ASSIGNED") return { label: "In Process", color: "#0369a1", bg: "#e0f2fe" };
+      return { label: "Pending Assignment", color: "#7a5b00", bg: "#fff4e5" };
+    }
+
+    return null;
+  };
+
+  const getStageTab = (memo) => {
+    if (!memo.stage) return 0;
+    const stageCaps = memo.stage.toUpperCase();
+
+    // 0. Job Work
+    if (stageCaps.includes("JOB_WORK") || stageCaps.includes("JOBWORK")) {
+      const status = memo.jobWorkStatus || "";
+      if (status === "IN_PROCESS" && (memo.jobWorkWorkerName || memo.jobWorkWorkerId)) return 1;
+      return 0;
+    }
+
+    // 1. Pre-Stitcher
+    if (stageCaps.includes("PRE_STITCHER") || stageCaps.includes("ASSIGN_PRE_STITCHER")) {
+      if (stageCaps === "ASSIGN_PRE_STITCHER") return 0;
+      if (stageCaps === "PRE_STITCHER_ASSIGNED") return 1;
+      if (stageCaps === "PRE_STITCHER_COMPLETED") return 2;
+      return 0;
+    }
+
+    // 2. Tailor
+    if (stageCaps.includes("TAILOR") || stageCaps.includes("ASSIGN_TAILOR")) {
+      const status = memo.tailorAssignmentStatus || "";
+      if (status === "ASSIGNED") return 1;
+      if (status === "COMPLETED") return 2;
+      return 0;
+    }
+
+    // 3. Kanch Button
+    if (stageCaps.includes("KANCH_BUTTON") || stageCaps.includes("KANCH")) {
+      const status = memo.kanchButtonAssignmentStatus || "";
+      const assigned = memo.kanchButtonAssigned;
+      if (status === "COMPLETED") return 2;
+      if (assigned && status === "ASSIGNED") return 1;
+      return 0;
+    }
+
+    return 0;
+  };
+
   const handleGoToStage = (memo) => {
     if (!memo.stage) return;
     const route = getStageRoute(memo.stage);
+    const tabIndex = getStageTab(memo);
     setOpen(false);
-    navigate(route);
+    navigate(route, {
+      state: {
+        activeTab: tabIndex,
+        searchDmNumber: memo.dmNumber || memo.deliveryMemoId,
+      },
+    });
   };
 
   const handleResultClick = (memo) => {
-    setSelectedMemo(memo);
-    setModalOpen(true);
-    setOpen(false);
+    if (memo.stage) {
+      handleGoToStage(memo);
+    } else {
+      setSelectedMemo(memo);
+      setModalOpen(true);
+      setOpen(false);
+    }
   };
 
   const clearSearch = () => {
@@ -192,17 +284,17 @@ const GlobalSearch = () => {
                         <Box sx={{ display: "flex", gap: 1, mt: 0.5, flexWrap: "wrap", alignItems: "center" }}>
                           {memo.stage ? (
                             <Tooltip title="Go to Stage Page" arrow>
-                              <Chip 
-                                label={memo.stage.replace(/_/g, " ")} 
-                                size="small" 
+                              <Chip
+                                label={memo.stage.replace(/_/g, " ")}
+                                size="small"
                                 color="primary"
                                 clickable
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleGoToStage(memo);
                                 }}
-                                sx={{ 
-                                  fontSize: "10px", 
+                                sx={{
+                                  fontSize: "10px",
                                   height: "18px",
                                   bgcolor: "#e0e7ff",
                                   color: "#4338ca",
@@ -211,23 +303,41 @@ const GlobalSearch = () => {
                                     bgcolor: "#c7d2fe",
                                     color: "#3730a3",
                                   }
-                                }} 
+                                }}
                               />
                             </Tooltip>
                           ) : (
-                            <Chip 
-                              label="N/A" 
-                              size="small" 
-                              variant="outlined" 
-                              sx={{ fontSize: "10px", height: "18px" }} 
+                            <Chip
+                              label="N/A"
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: "10px", height: "18px" }}
                             />
                           )}
+                          {(() => {
+                            const subChip = getSubStageChip(memo);
+                            if (!subChip) return null;
+                            return (
+                              <Chip
+                                label={subChip.label}
+                                size="small"
+                                sx={{
+                                  fontSize: "10px",
+                                  height: "18px",
+                                  fontWeight: 600,
+                                  bgcolor: subChip.bg,
+                                  color: subChip.color,
+                                  border: `1px solid ${subChip.color}44`,
+                                }}
+                              />
+                            );
+                          })()}
                           {memo.status === "CLOSED" && (
-                            <Chip 
-                              label="Closed" 
-                              size="small" 
-                              color="success" 
-                              sx={{ fontSize: "10px", height: "18px" }} 
+                            <Chip
+                              label="Closed"
+                              size="small"
+                              color="success"
+                              sx={{ fontSize: "10px", height: "18px" }}
                             />
                           )}
                         </Box>
@@ -279,4 +389,3 @@ const GlobalSearch = () => {
 };
 
 export default GlobalSearch;
- 

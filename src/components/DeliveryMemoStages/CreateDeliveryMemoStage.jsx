@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import CreateDeliveryMemoModal from "../../Modals/CreateDeliveryMemoModal";
 import axiosInstance from "../../utils/axiosInstance";
+import { useLocation } from "react-router-dom";
 import { DELIVERY_MEMO_STAGES, getMemoTitle } from "../../utils/deliveryMemo";
 import { CreateButton } from "../Styled";
 import NoResponsePage from "../../pages/NoResponsePage";
@@ -24,7 +25,18 @@ import MemoDetailDrawer from "../../Modals/MemoDetailDrawer";
 import moment from "moment/moment";
 
 const CreateDeliveryMemoStage = () => {
+  const location = useLocation();
   const { user } = useSelector((state) => state.auth);
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || ""
+  );
+
+  useEffect(() => {
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
+    }
+  }, [location.state]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +108,16 @@ const CreateDeliveryMemoStage = () => {
     [],
   );
 
+  const displayedMemos = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return memos;
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter(
+      (m) =>
+        (m.dmNumber && m.dmNumber.toLowerCase().includes(q)) ||
+        (m.deliveryMemoId && m.deliveryMemoId.toLowerCase().includes(q))
+    );
+  }, [memos, searchDmNumber]);
+
   useEffect(() => {
     if (user) {
       fetchDeliveryMemos();
@@ -144,15 +166,66 @@ const CreateDeliveryMemoStage = () => {
 
   return (
     <Box sx={{ p: 2 }}>
-      <CreateButton variant="contained" onClick={() => setIsModalOpen(true)}>
-        Create New Memo
-      </CreateButton>
+      <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <CreateButton variant="contained" onClick={() => setIsModalOpen(true)}>
+          Create New Memo
+        </CreateButton>
+      </Box>
 
-      {memos.length === 0 ? (
+      {searchDmNumber && (
+        <Box
+          sx={{
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: "#eef2ff",
+            p: 1.5,
+            px: 2,
+            borderRadius: "10px",
+            border: "1px solid #c7d2fe",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Chip
+              label={`DM Search Filter: "${searchDmNumber}"`}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+            <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+              Showing only matched Delivery Memo on Create Delivery Memo stage
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchDmNumber("");
+              try {
+                window.history.replaceState({}, document.title);
+              } catch (e) {}
+            }}
+            sx={{
+              textTransform: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              borderColor: "#6366f1",
+              color: "#4338ca",
+              backgroundColor: "#ffffff",
+              "&:hover": { backgroundColor: "#f5f3ff" },
+            }}
+          >
+            Show All Stage Memos
+          </Button>
+        </Box>
+      )}
+
+      {displayedMemos.length === 0 ? (
         <NoResponsePage />
       ) : (
         <Grid container spacing={2.5} mt={2}>
-          {memos.map((memo) => {
+          {displayedMemos.map((memo) => {
             const itemCount = memo.items?.length || 0;
             const uniqueColors = getUniqueColors(memo.items);
 
@@ -233,7 +306,7 @@ const CreateDeliveryMemoStage = () => {
                           color: "#6b7280",
                         }}
                       >
-                        {moment.utc(memo.createdAt).format("DD/MM/YYYY HH:mm")}
+                       {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                       </Typography>
                     </Box>
 

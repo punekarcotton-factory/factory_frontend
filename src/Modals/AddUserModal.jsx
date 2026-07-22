@@ -166,7 +166,11 @@ const AddUserModal = ({ open, onClose, onUserCreated, currentUser }) => {
   const fetchRoles = async () => {
     try {
       const response = await axiosInstance.get('/roles')
-      setRoles(response.data?.data || response.data || [])
+      const allRoles = response.data?.data || response.data || []
+      const filteredRoles = allRoles.filter(
+        r => r.roleName?.toLowerCase() !== 'job work' && r.roleName?.toLowerCase() !== 'jobwork'
+      )
+      setRoles(filteredRoles)
     } catch (error) {
       dispatch(showSnackbar({ open: true, severity: 'error', message: 'Failed to load roles. Please try again.' }))
     }

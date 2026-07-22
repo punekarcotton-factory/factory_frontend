@@ -30,12 +30,16 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
     email: '',
     phone: '',
     roleId: '',
+    tailorIdentifierId: '',
     password: ''
   })
   const [roles, setRoles] = useState([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const selectedRole = roles.find(r => (r.id || r._id) === formData.roleId)
+  const isTailorRole = selectedRole?.roleName?.toLowerCase() === 'tailor'
 
   const textFieldStyle = {
     '& .MuiInputBase-root': {
@@ -63,6 +67,7 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
         email: userToEdit.email || '',
         phone: userToEdit.phone || '',
         roleId: userToEdit.roleId || '',
+        tailorIdentifierId: userToEdit.tailorIdentifierId || '',
         password: ''
       })
       setError('')
@@ -74,7 +79,10 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
     try {
       const response = await axiosInstance.get('/roles')
       const rolesData = response.data?.data || response.data || []
-      setRoles(rolesData)
+      const filteredRoles = rolesData.filter(
+        r => r.roleName?.toLowerCase() !== 'job work' && r.roleName?.toLowerCase() !== 'jobwork'
+      )
+      setRoles(filteredRoles)
     } catch (err) {
       console.error('Error fetching roles:', err)
     }
@@ -137,6 +145,7 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
         email: formData.email,
         phone: formData.phone,
         roleId: formData.roleId,
+        tailorIdentifierId: formData.tailorIdentifierId,
         ...(formData.password ? { password: formData.password } : {})
       }
 
@@ -367,6 +376,43 @@ const EditUserModal = ({ open, onClose, userToEdit, onUserUpdated }) => {
               ))}
             </TextField>
           </Box>
+
+          {/* Tailor ID */}
+          {isTailorRole && (
+            <Box
+              sx={{
+                mb: 1.5,
+                p: 1.5,
+                borderRadius: '8px',
+                backgroundColor: '#f5f3ff',
+                border: '1px dashed #c4b5fd'
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  mb: 0.75
+                }}
+              >
+                Tailor ID
+                {!userToEdit?.tailorIdentifierId && (
+                  <span style={{ color: '#dc2626' }}> *</span>
+                )}
+              </Typography>
+              <TextField
+                fullWidth
+                size='small'
+                name='tailorIdentifierId'
+                placeholder='Enter tailor ID'
+                value={formData.tailorIdentifierId}
+                onChange={handleInputChange}
+                disabled={submitting || !!userToEdit?.tailorIdentifierId}
+                sx={textFieldStyle}
+              />
+            </Box>
+          )}
 
           {/* Password */}
           <Box>

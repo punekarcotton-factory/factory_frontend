@@ -13,6 +13,7 @@ import {
   WorkOutline,
 } from "@mui/icons-material";
 import {
+  Autocomplete,
   Alert,
   Avatar,
   Box,
@@ -183,7 +184,7 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
         getRemainingQuantity(opt.key) > 0,
     );
 
- 
+
   const getQtyBuckets = (groupKeys) => {
     const selected = selectedOptions.filter((k) => groupKeys.includes(k));
     if (selected.length === 0) return [];
@@ -193,11 +194,11 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
   const tailorBuckets = getQtyBuckets(TAILOR_OP_KEYS);
   const preStitcherBuckets = getQtyBuckets(PRE_STITCHER_OP_KEYS);
 
-  
+
   const bucketMapKey = (bucket, groupPrefix) =>
     bucket.keys.length === 1 ? bucket.keys[0] : `__${groupPrefix}_${bucket.keys[0]}__`;
 
- 
+
   const resolveCustomQty = (optionKey) => {
     const isTailor = TAILOR_OP_KEYS.includes(optionKey);
     const buckets = isTailor ? tailorBuckets : preStitcherBuckets;
@@ -381,9 +382,9 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
             const skuQty = isLastSku
               ? Math.min(itemSplitTarget - skuAllocated, skuObj.quantity)
               : Math.min(
-                  Math.round(skuObj.quantity * (itemSplitTarget / itemShirts)),
-                  skuObj.quantity,
-                );
+                Math.round(skuObj.quantity * (itemSplitTarget / itemShirts)),
+                skuObj.quantity,
+              );
             skuAllocated += skuQty;
             return { sku: skuObj.sku, quantity: skuQty };
           })
@@ -552,11 +553,11 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
           const label = isShared && bucket.keys.length > 1
             ? "All Selected Operations"
             : bucket.keys
-                .map(
-                  (k) =>
-                    availableOptions.find((o) => o.key === k)?.label ?? k,
-                )
-                .join(" & ");
+              .map(
+                (k) =>
+                  availableOptions.find((o) => o.key === k)?.label ?? k,
+              )
+              .join(" & ");
 
           return (
             <Box key={mapKey}>
@@ -803,36 +804,41 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
                 </Typography>
 
                 {/* Tailor Select */}
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel id="tailor-select-label">Select Tailor</InputLabel>
-                  <Select
-                    labelId="tailor-select-label"
-                    value={selectedTailor}
-                    label="Select Tailor"
-                    onChange={(e) => setSelectedTailor(e.target.value)}
-                    size={isSmallMobile ? "small" : "medium"}
-                  >
-                    {tailors.map((tailor) => (
-                      <MenuItem key={tailor._id} value={tailor._id}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                          <Avatar
-                            sx={{ width: 28, height: 28, fontSize: 12, backgroundColor: "#667eea" }}
-                          >
-                            {tailor.name.charAt(0)}
-                          </Avatar>
-                          <Box>
-                            <Typography sx={{ fontWeight: 500, fontSize: { xs: 13, sm: 14 } }}>
-                              {tailor.name}
-                            </Typography>
-                            <Typography sx={{ fontSize: { xs: 10, sm: 11 }, color: "#6b7280" }}>
-                              {tailor.phoneNumber}
-                            </Typography>
-                          </Box>
+                <Autocomplete
+                  options={tailors}
+                  getOptionLabel={(tailor) => tailor.name || ""}
+                  filterOptions={(options, { inputValue }) =>
+                    options.filter(
+                      (t) =>
+                        t.name?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                        t.tailorIdentifierId?.toLowerCase().includes(inputValue.toLowerCase())
+                    )
+                  }
+                  value={tailors.find((t) => t._id === selectedTailor) || null}
+                  onChange={(_, newValue) => setSelectedTailor(newValue?._id || "")}
+                  size={isSmallMobile ? "small" : "medium"}
+                  sx={{ mb: 2 }}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Select Tailor" />
+                  )}
+                  renderOption={(props, tailor) => (
+                    <Box component="li" {...props} key={tailor._id}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Avatar sx={{ width: 28, height: 28, fontSize: 12, backgroundColor: "#667eea" }}>
+                          {tailor.name.charAt(0)}
+                        </Avatar>
+                        <Box>
+                          <Typography sx={{ fontWeight: 500, fontSize: { xs: 13, sm: 14 } }}>
+                            {tailor.name}
+                          </Typography>
+                          <Typography sx={{ fontSize: { xs: 10, sm: 11 }, color: "#6b7280" }}>
+                            {tailor.tailorIdentifierId}
+                          </Typography>
                         </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                      </Box>
+                    </Box>
+                  )}
+                />
 
                 {/* Tailor Operations */}
                 <FormControl fullWidth sx={{ mb: 2 }}>
@@ -1083,7 +1089,7 @@ const AssignMultipleTailorsModal = ({ open, onClose, memo, onSuccess }) => {
                             </Box>
                           )}
 
-                         
+
                           {preStitcherBuckets.length > 0 && (
                             <Box>
                               {preStitcherBuckets.length > 1 && (

@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useLocation } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { DELIVERY_MEMO_STAGES, getMemoTitle } from "../../utils/deliveryMemo";
 import { showSnackbar } from "../../Slice/snackbarSlice";
@@ -28,7 +29,18 @@ import moment from "moment";
 
 const CuttingStage = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { user } = useSelector((state) => state.auth);
+  const [searchDmNumber, setSearchDmNumber] = useState(
+    () => location.state?.searchDmNumber || ""
+  );
+
+  useEffect(() => {
+    if (location.state?.searchDmNumber) {
+      setSearchDmNumber(location.state.searchDmNumber);
+    }
+  }, [location.state]);
+
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailDrawer, setDetailDrawer] = useState({ open: false, memo: null });
@@ -180,6 +192,16 @@ const CuttingStage = () => {
     }
   }, [user, fetchCuttingMemos]);
 
+  const displayedMemos = useMemo(() => {
+    if (!searchDmNumber || !searchDmNumber.trim()) return memos;
+    const q = searchDmNumber.trim().toLowerCase();
+    return memos.filter(
+      (m) =>
+        (m.dmNumber && m.dmNumber.toLowerCase().includes(q)) ||
+        (m.deliveryMemoId && m.deliveryMemoId.toLowerCase().includes(q))
+    );
+  }, [memos, searchDmNumber]);
+
   if (loading) {
     return (
       <Box sx={{ p: 2 }}>
@@ -222,11 +244,60 @@ const CuttingStage = () => {
 
   return (
     <Box sx={{ p: 2 }}>
-      {memos.length === 0 ? (
+      {searchDmNumber && (
+        <Box
+          sx={{
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: "#eef2ff",
+            p: 1.5,
+            px: 2,
+            borderRadius: "10px",
+            border: "1px solid #c7d2fe",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Chip
+              label={`DM Search Filter: "${searchDmNumber}"`}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+            <Typography fontSize="13px" color="#3730a3" fontWeight={500}>
+              Showing only matched Delivery Memo on Cutting stage
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchDmNumber("");
+              try {
+                window.history.replaceState({}, document.title);
+              } catch (e) {}
+            }}
+            sx={{
+              textTransform: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              borderColor: "#6366f1",
+              color: "#4338ca",
+              backgroundColor: "#ffffff",
+              "&:hover": { backgroundColor: "#f5f3ff" },
+            }}
+          >
+            Show All Stage Memos
+          </Button>
+        </Box>
+      )}
+
+      {displayedMemos.length === 0 ? (
         <NoResponsePage />
       ) : (
         <Grid container spacing={2.5}>
-          {memos.map((memo) => {
+          {displayedMemos.map((memo) => {
             const uniqueColors = getUniqueColors(memo.items);
             return (
               <Grid item xs={12} sm={6} md={4} lg={3} key={memo.deliveryMemoId}>
@@ -348,7 +419,7 @@ const CuttingStage = () => {
                           color: "#6b7280",
                         }}
                       >
-                        {moment.utc(memo.createdAt).format("DD/MM/YYYY HH:mm")}
+                        {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                       </Typography>
                     </Box>
 
