@@ -26,6 +26,7 @@ import {
 import axiosInstance from "../utils/axiosInstance";
 import { StyledTableCell, StyledTableRow } from "../components/Styled";
 import { resolveImageUrl } from "../config";
+import moment from "moment";
 
 export default function CuttingViewHistory({ open, onClose, selectedMemo }) {
   const [memoData, setMemoData] = useState(null);
@@ -94,7 +95,6 @@ export default function CuttingViewHistory({ open, onClose, selectedMemo }) {
         ) : memoData ? (
           <Box sx={{ p: 1 }}>
             {/* Stage & meta */}
-           
 
             {memoData.createdBy && (
               <Box
@@ -107,22 +107,7 @@ export default function CuttingViewHistory({ open, onClose, selectedMemo }) {
               </Box>
             )}
 
-            {memoData.createdAt && (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}
-              >
-                <Schedule sx={{ fontSize: 18, color: "#6b7280" }} />
-                <Typography sx={{ fontSize: "14px", color: "#6b7280" }}>
-                  {new Date(memoData.createdAt).toLocaleString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Typography>
-              </Box>
-            )}
+            {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
 
             {/* Summary chips */}
             <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
@@ -235,7 +220,7 @@ export default function CuttingViewHistory({ open, onClose, selectedMemo }) {
                       </StyledTableCell>
                       <StyledTableCell>
                         <Typography sx={{ fontSize: "13px" }}>
-                          {item.shirtSKUs?.join(', ') || "—"}
+                          {item.shirtSKUs?.join(", ") || "—"}
                         </Typography>
                       </StyledTableCell>
                       <StyledTableCell>

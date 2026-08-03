@@ -11,7 +11,7 @@ import {
   Divider,
   IconButton,
   TextField,
-  Typography
+  Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -52,6 +52,23 @@ const CreateDeliveryMemoModal = ({
   const [damageNotes, setDamageNotes] = useState("");
   const [submittingDamage, setSubmittingDamage] = useState(false);
 
+  const [leftoverModalOpen, setLeftoverModalOpen] = useState(false);
+  const [selectedFabricForLeftover, setSelectedFabricForLeftover] =
+    useState(null);
+  const [selectedEntryForLeftover, setSelectedEntryForLeftover] =
+    useState(null);
+  const [leftoverQuantity, setLeftoverQuantity] = useState("");
+  const [leftoverNotes, setLeftoverNotes] = useState("");
+  const [submittingLeftover, setSubmittingLeftover] = useState(false);
+
+  // parseFloat chains (dhap * fold - alreadyRecorded, etc.) can leave tiny
+  // binary floating-point residues, e.g. 4.999999999999998 instead of 5.
+  // We only ever display/accept 2 decimal places, so round both sides to 2
+  // decimals before comparing — otherwise a value equal to the max gets
+  // falsely flagged as "over" by a fraction of a fraction of a meter.
+  const round2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+  const isOverAllowed = (entered, max) => round2(entered) > round2(max);
+
   const textFieldStyle = {
     "& .MuiInputBase-root": {
       fontSize: "14px",
@@ -88,14 +105,19 @@ const CreateDeliveryMemoModal = ({
             fabricSKU: item.fabricSKU || "",
             dhap: String(item.dhap || ""),
             fold: String(item.fold || ""),
-          }))
+            leftoverQuantity: String(item.leftoverQuantity || "0"),
+          })),
         );
       } else {
-        setEntries([{ fabricSKU: "", dhap: "", fold: "" }]);
+        setEntries([
+          { fabricSKU: "", dhap: "", fold: "", leftoverQuantity: "0" },
+        ]);
       }
     } else {
       setDmNumber("");
-      setEntries([{ fabricSKU: "", dhap: "", fold: "" }]);
+      setEntries([
+        { fabricSKU: "", dhap: "", fold: "", leftoverQuantity: "0" },
+      ]);
     }
     setError("");
 
@@ -103,7 +125,7 @@ const CreateDeliveryMemoModal = ({
       setLoadingSKUs(true);
       try {
         const response = await axiosInstance.get(
-          "/delivery-memos/fabrics/available"
+          "/delivery-memos/fabrics/available",
         );
         let fetchedSKUs = response.data.data || [];
 
@@ -137,12 +159,12 @@ const CreateDeliveryMemoModal = ({
   const handleEntryChange = (index, field, value) => {
     if (field === "fabricSKU" && value) {
       const isDuplicate = entries.some(
-        (entry, idx) => idx !== index && entry.fabricSKU === value
+        (entry, idx) => idx !== index && entry.fabricSKU === value,
       );
 
       if (isDuplicate) {
         setError(
-          `SKU "${value}" is already added. Please select a different SKU.`
+          `SKU "${value}" is already added. Please select a different SKU.`,
         );
         return;
       }
@@ -184,7 +206,7 @@ const CreateDeliveryMemoModal = ({
 
   const handleOpenDamageModal = (fabric) => {
     setSelectedFabricForDamage(fabric);
-    setDamageQuantity(0); 
+    setDamageQuantity(0);
     setDamageNotes("");
     setDamageModalOpen(true);
   };
@@ -200,7 +222,7 @@ const CreateDeliveryMemoModal = ({
           open: true,
           severity: "error",
           message: "Please enter a valid damage quantity",
-        })
+        }),
       );
       return;
     }
@@ -211,7 +233,7 @@ const CreateDeliveryMemoModal = ({
           open: true,
           severity: "error",
           message: `Cannot damage more than available (${selectedFabricForDamage.quantity}m)`,
-        })
+        }),
       );
       return;
     }
@@ -225,9 +247,10 @@ const CreateDeliveryMemoModal = ({
         `/fabrics/${selectedFabricForDamage.sku}/damage`,
         {
           damagedQuantity: quantity,
-          notes: damageNotes || `Damaged ${quantity}m - marked as permanent loss`,
+          notes:
+            damageNotes || `Damaged ${quantity}m - marked as permanent loss`,
           performedBy: userId,
-        }
+        },
       );
 
       dispatch(
@@ -235,7 +258,7 @@ const CreateDeliveryMemoModal = ({
           open: true,
           severity: "success",
           message: `Successfully marked ${quantity}m as damaged for ${selectedFabricForDamage.sku}`,
-        })
+        }),
       );
 
       setDamageModalOpen(false);
@@ -244,7 +267,7 @@ const CreateDeliveryMemoModal = ({
       setDamageNotes("");
 
       const response = await axiosInstance.get(
-        "/delivery-memos/fabrics/available"
+        "/delivery-memos/fabrics/available",
       );
       setFabricSKUs(response.data.data || []);
     } catch (error) {
@@ -253,12 +276,117 @@ const CreateDeliveryMemoModal = ({
           open: true,
           severity: "error",
           message:
-            error.response?.data?.message ||
-            "Failed to mark fabric as damaged",
-        })
+            error.response?.data?.message || "Failed to mark fabric as damaged",
+        }),
       );
     } finally {
       setSubmittingDamage(false);
+    }
+  };
+
+  const handleOpenLeftoverModal = (fabric, entry = null) => {
+    setSelectedFabricForLeftover(fabric);
+    setSelectedEntryForLeftover(entry);
+    setLeftoverQuantity("");
+    setLeftoverNotes("");
+    setLeftoverModalOpen(true);
+  };
+
+  const handleMarkLeftover = async () => {
+    if (!selectedFabricForLeftover) return;
+
+    const quantity = parseFloat(leftoverQuantity);
+
+    if (!quantity || quantity <= 0) {
+      dispatch(
+        showSnackbar({
+          open: true,
+          severity: "error",
+          message: "Please enter a valid leftover quantity",
+        }),
+      );
+      return;
+    }
+
+    // Validate: leftover cannot exceed the fabric allocated for this entry
+    if (selectedEntryForLeftover) {
+      const allocatedQty =
+        parseFloat(selectedEntryForLeftover.dhap || "0") *
+        parseFloat(selectedEntryForLeftover.fold || "0");
+      const alreadyRecorded = parseFloat(
+        selectedEntryForLeftover.leftoverQuantity || "0",
+      );
+      const maxAllowed = allocatedQty - alreadyRecorded;
+
+      if (isOverAllowed(quantity, maxAllowed)) {
+        dispatch(
+          showSnackbar({
+            open: true,
+            severity: "error",
+            message: `Leftover (${quantity}m) cannot exceed the fabric allocated for this entry (${maxAllowed.toFixed(2)}m).`,
+          }),
+        );
+        return;
+      }
+    }
+
+    setSubmittingLeftover(true);
+
+    try {
+      const userId = currentUser?.id || currentUser?._id || currentUser?.userId;
+      const deliveryMemoId = editMemo?.deliveryMemoId || editMemo?._id || null;
+
+      await axiosInstance.post(
+        `/fabrics/${selectedFabricForLeftover.sku}/leftover`,
+        {
+          leftoverQuantity: quantity,
+          deliveryMemoId,
+          notes: leftoverNotes,
+          performedBy: userId,
+        },
+      );
+
+      dispatch(
+        showSnackbar({
+          open: true,
+          severity: "success",
+          message: `Successfully recorded ${quantity}m leftover fabric for ${selectedFabricForLeftover.sku}`,
+        }),
+      );
+
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.fabricSKU === selectedFabricForLeftover.sku
+            ? {
+                ...e,
+                leftoverQuantity: String(
+                  parseFloat(e.leftoverQuantity || "0") + quantity,
+                ),
+              }
+            : e,
+        ),
+      );
+
+      setLeftoverModalOpen(false);
+      setSelectedFabricForLeftover(null);
+      setLeftoverQuantity("");
+      setLeftoverNotes("");
+
+      const response = await axiosInstance.get(
+        "/delivery-memos/fabrics/available",
+      );
+      setFabricSKUs(response.data.data || []);
+    } catch (error) {
+      dispatch(
+        showSnackbar({
+          open: true,
+          severity: "error",
+          message:
+            error.response?.data?.message || "Failed to record leftover fabric",
+        }),
+      );
+    } finally {
+      setSubmittingLeftover(false);
     }
   };
 
@@ -291,8 +419,8 @@ const CreateDeliveryMemoModal = ({
     if (duplicates.length > 0) {
       setError(
         `Duplicate SKU(s) found: ${[...new Set(duplicates)].join(
-          ", "
-        )}. Each SKU can only be added once.`
+          ", ",
+        )}. Each SKU can only be added once.`,
       );
       return;
     }
@@ -304,14 +432,19 @@ const CreateDeliveryMemoModal = ({
       const foldNum = parseFloat(entry.fold || "0");
       const totalNeeded = dhapNum * foldNum;
 
-      // Adjust available quantity by adding back the original quantity of this memo item (if editing)
-      const originalItem = editMemo?.items?.find((item) => item.fabricSKU === entry.fabricSKU);
-      const originalQty = originalItem ? parseFloat(originalItem.totalDhapFold || "0") : 0;
+      // Adjust available quantity by adding back the original gross quantity of this memo item (if editing)
+      const originalItem = editMemo?.items?.find(
+        (item) => item.fabricSKU === entry.fabricSKU,
+      );
+      const originalQty = originalItem
+        ? parseFloat(originalItem.dhap || "0") *
+          parseFloat(originalItem.fold || "0")
+        : 0;
       const availableQty = (selectedFabric?.quantity || 0) + originalQty;
 
       if (totalNeeded > availableQty) {
         setError(
-          `Insufficient fabric for ${entry.fabricSKU}. Available: ${availableQty}m, Required: ${totalNeeded}m (${dhapNum}m × ${foldNum} fold)`
+          `Insufficient fabric for ${entry.fabricSKU}. Available: ${availableQty}m, Required: ${totalNeeded}m (${dhapNum}m × ${foldNum} fold)`,
         );
         return;
       }
@@ -330,15 +463,18 @@ const CreateDeliveryMemoModal = ({
         memos: entries.map((e) => {
           const dhapNum = parseFloat(e.dhap || "0");
           const foldNum = parseFloat(e.fold || "0");
-          const itemTotal =
+          const leftoverNum = parseFloat(e.leftoverQuantity || "0");
+          const grossTotal =
             !Number.isNaN(dhapNum) && !Number.isNaN(foldNum)
               ? dhapNum * foldNum
               : 0;
+          const itemTotal = Math.max(0, grossTotal - leftoverNum);
 
           return {
             fabricSKU: e.fabricSKU,
             dhap: e.dhap,
             fold: e.fold,
+            leftoverQuantity: leftoverNum,
             totalDhapFold: itemTotal,
           };
         }),
@@ -348,13 +484,16 @@ const CreateDeliveryMemoModal = ({
       };
 
       if (editMemo) {
-        await axiosInstance.put(`/delivery-memos/${editMemo.deliveryMemoId}`, payload);
+        await axiosInstance.put(
+          `/delivery-memos/${editMemo.deliveryMemoId}`,
+          payload,
+        );
         dispatch(
           showSnackbar({
             open: true,
             severity: "success",
             message: `Delivery memo updated successfully!`,
-          })
+          }),
         );
       } else {
         await axiosInstance.post("/delivery-memos", payload);
@@ -364,7 +503,7 @@ const CreateDeliveryMemoModal = ({
             open: true,
             severity: "success",
             message: `${entries.length} delivery memo(s) created successfully!`,
-          })
+          }),
         );
       }
 
@@ -376,7 +515,7 @@ const CreateDeliveryMemoModal = ({
     } catch (error) {
       setError(
         error.response?.data?.message ||
-          `Failed to ${editMemo ? "update" : "create"} delivery memo. Please try again.`
+          `Failed to ${editMemo ? "update" : "create"} delivery memo. Please try again.`,
       );
     } finally {
       setSubmitting(false);
@@ -412,7 +551,9 @@ const CreateDeliveryMemoModal = ({
               justifyContent: "space-between",
             }}
           >
-            <DialogHeader>{editMemo ? "Edit Delivery Memo" : "Create Delivery Memo"}</DialogHeader>
+            <DialogHeader>
+              {editMemo ? "Edit Delivery Memo" : "Create Delivery Memo"}
+            </DialogHeader>
 
             <IconButton
               onClick={handleClose}
@@ -458,7 +599,8 @@ const CreateDeliveryMemoModal = ({
 
           {!loadingSKUs && fabricSKUs.length === 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              No fabrics with available quantity found. Please add fabrics first.
+              No fabrics with available quantity found. Please add fabrics
+              first.
             </Alert>
           )}
 
@@ -489,24 +631,33 @@ const CreateDeliveryMemoModal = ({
             {entries.map((entry, index) => {
               const dhapNum = parseFloat(entry.dhap || "0");
               const foldNum = parseFloat(entry.fold || "0");
-              const itemTotal =
+              const leftoverNum = parseFloat(entry.leftoverQuantity || "0");
+              const grossTotal =
                 !Number.isNaN(dhapNum) && !Number.isNaN(foldNum)
                   ? dhapNum * foldNum
                   : 0;
+              const itemTotal = Math.max(0, grossTotal - leftoverNum);
 
               const selectedFabric = fabricSKUs.find(
-                (f) => f.sku === entry.fabricSKU
+                (f) => f.sku === entry.fabricSKU,
               );
 
-              // Calculate available quantity taking editMemo original allocation into account
-              const originalItem = editMemo?.items?.find((item) => item.fabricSKU === entry.fabricSKU);
-              const originalQty = originalItem ? parseFloat(originalItem.totalDhapFold || "0") : 0;
-              const availableQty = (selectedFabric?.quantity || 0) + originalQty;
+              // Calculate available quantity taking editMemo original allocation into account (gross)
+              const originalItem = editMemo?.items?.find(
+                (item) => item.fabricSKU === entry.fabricSKU,
+              );
+              const originalQty = originalItem
+                ? parseFloat(originalItem.dhap || "0") *
+                  parseFloat(originalItem.fold || "0")
+                : 0;
+              const availableQty =
+                (selectedFabric?.quantity || 0) + originalQty;
 
               const hasInsufficientQty =
-                selectedFabric && itemTotal > availableQty;
+                selectedFabric && grossTotal > availableQty;
 
-              const hasLowStock = selectedFabric && (availableQty - itemTotal) < 6;
+              const hasLowStock =
+                selectedFabric && availableQty - itemTotal < 6;
 
               const isExpanded = expandedIndex === index;
               const isComplete = isEntryComplete(entry);
@@ -576,8 +727,19 @@ const CreateDeliveryMemoModal = ({
                             <Typography
                               sx={{ fontSize: "12px", color: "#6b7280" }}
                             >
-                              {dhapNum}m/fold × {foldNum} fold ={" "}
-                              {itemTotal.toFixed(2)}m total
+                              {leftoverNum > 0 ? (
+                                <>
+                                  {dhapNum}m/fold × {foldNum} fold ={" "}
+                                  {grossTotal.toFixed(2)}m (Leftover:{" "}
+                                  {leftoverNum.toFixed(2)}m → Net:{" "}
+                                  {itemTotal.toFixed(2)}m)
+                                </>
+                              ) : (
+                                <>
+                                  {dhapNum}m/fold × {foldNum} fold ={" "}
+                                  {itemTotal.toFixed(2)}m total
+                                </>
+                              )}
                             </Typography>
                           </>
                         ) : (
@@ -601,7 +763,9 @@ const CreateDeliveryMemoModal = ({
                     <IconButton
                       size="small"
                       sx={{
-                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                        transform: isExpanded
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
                         transition: "transform 0.3s",
                       }}
                     >
@@ -640,7 +804,7 @@ const CreateDeliveryMemoModal = ({
                           }
                           renderOption={(props, option) => {
                             const isLowStock = option.quantity < 6;
-                            
+
                             return (
                               <Box component="li" {...props} key={option.sku}>
                                 <Box
@@ -652,18 +816,35 @@ const CreateDeliveryMemoModal = ({
                                   }}
                                 >
                                   <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                      }}
+                                    >
                                       <Typography
-                                        sx={{ fontSize: "14px", fontWeight: 600 }}
+                                        sx={{
+                                          fontSize: "14px",
+                                          fontWeight: 600,
+                                        }}
                                       >
                                         {option.sku}
                                       </Typography>
                                       {isLowStock && (
-                                        <Warning sx={{ fontSize: 16, color: "#f59e0b" }} />
+                                        <Warning
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#f59e0b",
+                                          }}
+                                        />
                                       )}
                                     </Box>
                                     <Typography
-                                      sx={{ fontSize: "12px", color: "#6b7280" }}
+                                      sx={{
+                                        fontSize: "12px",
+                                        color: "#6b7280",
+                                      }}
                                     >
                                       {option.title && `${option.title}`}
                                       {option.color && ` • ${option.color}`}
@@ -674,7 +855,9 @@ const CreateDeliveryMemoModal = ({
                                       ml: 2,
                                       px: 1.5,
                                       py: 0.5,
-                                      backgroundColor: isLowStock ? "#fef3c7" : "#f0fdf4",
+                                      backgroundColor: isLowStock
+                                        ? "#fef3c7"
+                                        : "#f0fdf4",
                                       borderRadius: "6px",
                                     }}
                                   >
@@ -682,7 +865,9 @@ const CreateDeliveryMemoModal = ({
                                       sx={{
                                         fontSize: "12px",
                                         fontWeight: 600,
-                                        color: isLowStock ? "#f59e0b" : "#16a34a",
+                                        color: isLowStock
+                                          ? "#f59e0b"
+                                          : "#16a34a",
                                       }}
                                     >
                                       {option.quantity}m
@@ -720,8 +905,8 @@ const CreateDeliveryMemoModal = ({
                               severity="info"
                               sx={{ mt: 1, fontSize: "12px" }}
                             >
-                              All available SKUs have been added. Remove an entry
-                              to add a different SKU.
+                              All available SKUs have been added. Remove an
+                              entry to add a different SKU.
                             </Alert>
                           )}
 
@@ -739,22 +924,61 @@ const CreateDeliveryMemoModal = ({
                             <Typography
                               sx={{
                                 fontSize: "12px",
-                                color: hasInsufficientQty ? "#dc2626" : "#16a34a",
+                                color: hasInsufficientQty
+                                  ? "#dc2626"
+                                  : "#16a34a",
                                 fontWeight: 500,
                               }}
                             >
-                              {hasInsufficientQty ? "⚠" : "✓"} Available in stock: {(availableQty - itemTotal).toFixed(2)}m
+                              {hasInsufficientQty ? "⚠" : "✓"} Available in
+                              stock:{" "}
+                              {parseFloat(selectedFabric.quantity || 0).toFixed(
+                                2,
+                              )}
+                              m
                             </Typography>
                           </Box>
                         )}
 
                         {selectedFabric && (
-                          <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Box
+                            sx={{
+                              mt: 1,
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              gap: 1,
+                            }}
+                          >
+                            {editMemo && (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onClick={() =>
+                                  handleOpenLeftoverModal(selectedFabric, entry)
+                                }
+                                sx={{
+                                  fontSize: "12px",
+                                  textTransform: "none",
+                                  fontWeight: 600,
+                                  borderColor: "#2563eb",
+                                  color: "#2563eb",
+                                  "&:hover": {
+                                    borderColor: "#1d4ed8",
+                                    backgroundColor: "#eff6ff",
+                                  },
+                                }}
+                              >
+                                Mark as Leftover
+                              </Button>
+                            )}
                             <Button
                               variant="outlined"
                               size="small"
                               color="error"
-                              onClick={() => handleOpenDamageModal(selectedFabric)}
+                              onClick={() =>
+                                handleOpenDamageModal(selectedFabric)
+                              }
                               sx={{
                                 fontSize: "12px",
                                 textTransform: "none",
@@ -771,13 +995,14 @@ const CreateDeliveryMemoModal = ({
                             </Button>
                           </Box>
                         )}
-                        
+
                         {hasLowStock && !hasInsufficientQty && (
                           <Alert
                             severity="warning"
                             sx={{ mt: 1, fontSize: "12px" }}
                           >
-                            ⚠ Low stock ({(availableQty - itemTotal).toFixed(2)}m) remaining
+                            ⚠ Low stock ({(availableQty - itemTotal).toFixed(2)}
+                            m) remaining
                           </Alert>
                         )}
                       </Box>
@@ -864,7 +1089,8 @@ const CreateDeliveryMemoModal = ({
                               mb: 0.5,
                             }}
                           >
-                            TOTAL FABRIC REQUIRED
+                            TOTAL FABRIC REQUIRED{" "}
+                            {leftoverNum > 0 ? "(NET)" : ""}
                           </Typography>
                           <Typography
                             sx={{
@@ -875,6 +1101,19 @@ const CreateDeliveryMemoModal = ({
                           >
                             {itemTotal.toFixed(2)}m
                           </Typography>
+                          {leftoverNum > 0 && (
+                            <Typography
+                              sx={{
+                                fontSize: "11px",
+                                color: "#166534",
+                                fontWeight: 500,
+                                mt: 0.5,
+                              }}
+                            >
+                              ({grossTotal.toFixed(2)}m gross -{" "}
+                              {leftoverNum.toFixed(2)}m leftover)
+                            </Typography>
+                          )}
                           {hasInsufficientQty && (
                             <Typography
                               sx={{
@@ -965,7 +1204,13 @@ const CreateDeliveryMemoModal = ({
             disabled={submitting || fabricSKUs.length === 0}
             fullWidth
           >
-            {submitting ? (editMemo ? "Updating..." : "Creating...") : (editMemo ? "Update Memo" : "Create Memo")}
+            {submitting
+              ? editMemo
+                ? "Updating..."
+                : "Creating..."
+              : editMemo
+                ? "Update Memo"
+                : "Create Memo"}
           </DialogSubmitButton>
         </DialogFooter>
       </DialogBox>
@@ -1157,14 +1402,24 @@ const CreateDeliveryMemoModal = ({
                     </Typography>
                   </Box>
                   <Divider sx={{ my: 1, borderColor: "#fca5a5" }} />
-                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Box
+                    sx={{ display: "flex", justifyContent: "space-between" }}
+                  >
                     <Typography
-                      sx={{ fontSize: "14px", fontWeight: 600, color: "#7c2d12" }}
+                      sx={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#7c2d12",
+                      }}
                     >
                       Remaining Stock:
                     </Typography>
                     <Typography
-                      sx={{ fontSize: "16px", fontWeight: 700, color: "#dc2626" }}
+                      sx={{
+                        fontSize: "16px",
+                        fontWeight: 700,
+                        color: "#dc2626",
+                      }}
                     >
                       {(
                         selectedFabricForDamage.quantity -
@@ -1203,6 +1458,385 @@ const CreateDeliveryMemoModal = ({
             }}
           >
             {submittingDamage ? "Processing..." : "Mark as Damaged"}
+          </DialogSubmitButton>
+        </DialogFooter>
+      </DialogBox>
+
+      {/* Leftover Fabric Modal */}
+      <DialogBox
+        open={leftoverModalOpen}
+        onClose={() => !submittingLeftover && setLeftoverModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <DialogHeader>Mark Fabric as Leftover</DialogHeader>
+            <IconButton
+              onClick={() => setLeftoverModalOpen(false)}
+              disabled={submittingLeftover}
+              sx={{
+                color: "#9ca3af",
+                "&:hover": { backgroundColor: "#f3f4f6", color: "#6b7280" },
+              }}
+            >
+              <Close fontSize="small" />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <Divider />
+
+        <DialogContent sx={{ px: 3, pb: 3 }}>
+          {selectedFabricForLeftover && (
+            <>
+              <Box
+                sx={{
+                  mb: 3,
+                  p: 2,
+                  backgroundColor: "#f9fafb",
+                  borderRadius: "8px",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <Typography sx={{ fontSize: "14px", fontWeight: 600, mb: 1 }}>
+                  Fabric Details
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+                  <Typography sx={{ fontSize: "13px", fontWeight: 500 }}>
+                    SKU:
+                  </Typography>
+                  <Typography sx={{ fontSize: "13px" }}>
+                    {selectedFabricForLeftover.sku}
+                  </Typography>
+                </Box>
+                {selectedFabricForLeftover.title && (
+                  <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 500 }}>
+                      Title:
+                    </Typography>
+                    <Typography sx={{ fontSize: "13px" }}>
+                      {selectedFabricForLeftover.title}
+                    </Typography>
+                  </Box>
+                )}
+                {selectedEntryForLeftover && (
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Typography
+                      sx={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#2563eb",
+                      }}
+                    >
+                      Total Fabric Allocated:
+                    </Typography>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 600 }}>
+                      {(
+                        parseFloat(selectedEntryForLeftover.dhap || "0") *
+                        parseFloat(selectedEntryForLeftover.fold || "0")
+                      ).toFixed(2)}
+                      m
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  sx={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#374151",
+                    mb: 0.75,
+                  }}
+                >
+                  Leftover Quantity (meters)
+                </Typography>
+                {(() => {
+                  const allocatedQty = selectedEntryForLeftover
+                    ? parseFloat(selectedEntryForLeftover.dhap || "0") *
+                      parseFloat(selectedEntryForLeftover.fold || "0")
+                    : null;
+                  const alreadyRecorded = selectedEntryForLeftover
+                    ? parseFloat(
+                        selectedEntryForLeftover.leftoverQuantity || "0",
+                      )
+                    : 0;
+                  const maxAllowed =
+                    allocatedQty !== null
+                      ? allocatedQty - alreadyRecorded
+                      : null;
+                  const enteredQty = parseFloat(leftoverQuantity || "0");
+                  const isExceedingAllocated =
+                    maxAllowed !== null && isOverAllowed(enteredQty, maxAllowed);
+
+                  return (
+                    <TextField
+                      fullWidth
+                      type="number"
+                      placeholder="Enter leftover fabric quantity"
+                      size="small"
+                      sx={{
+                        ...textFieldStyle,
+                        ...(isExceedingAllocated && {
+                          "& .MuiOutlinedInput-root": {
+                            "& fieldset": { borderColor: "#ef4444" },
+                            "&:hover fieldset": { borderColor: "#dc2626" },
+                            "&.Mui-focused fieldset": {
+                              borderColor: "#dc2626",
+                              borderWidth: "1.5px",
+                            },
+                          },
+                        }),
+                      }}
+                      value={leftoverQuantity}
+                      disabled={submittingLeftover}
+                      inputProps={{
+                        step: "0.01",
+                        min: "0.01",
+                        max: maxAllowed !== null ? maxAllowed : undefined,
+                      }}
+                      onChange={(e) => setLeftoverQuantity(e.target.value)}
+                      onWheel={handleWheel}
+                      helperText={
+                        maxAllowed !== null
+                          ? isExceedingAllocated
+                            ? `⚠ Cannot exceed allocated quantity (${maxAllowed.toFixed(2)}m)`
+                            : `Max allowed: ${maxAllowed.toFixed(2)}m (Total allocated: ${allocatedQty.toFixed(2)}m)`
+                          : ""
+                      }
+                      FormHelperTextProps={{
+                        sx: {
+                          color: isExceedingAllocated ? "#ef4444" : "#6b7280",
+                          fontWeight: isExceedingAllocated ? 600 : 400,
+                        },
+                      }}
+                    />
+                  );
+                })()}
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  sx={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#374151",
+                    mb: 0.75,
+                  }}
+                >
+                  Notes (Optional)
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  placeholder="Enter reason or notes for leftover fabric..."
+                  size="small"
+                  sx={textFieldStyle}
+                  value={leftoverNotes}
+                  disabled={submittingLeftover}
+                  onChange={(e) => setLeftoverNotes(e.target.value)}
+                />
+              </Box>
+
+              {/* Leftover Deduction Preview (Total Allotted - Leftover) */}
+              {parseFloat(leftoverQuantity) > 0 && selectedEntryForLeftover && (() => {
+                const allocatedQty =
+                  parseFloat(selectedEntryForLeftover.dhap || "0") *
+                  parseFloat(selectedEntryForLeftover.fold || "0");
+                const alreadyRecorded = parseFloat(
+                  selectedEntryForLeftover.leftoverQuantity || "0",
+                );
+                const maxAllowed = allocatedQty - alreadyRecorded;
+                const enteredQty = parseFloat(leftoverQuantity || "0");
+                const totalLeftover = alreadyRecorded + enteredQty;
+                const netRemaining = Math.max(0, allocatedQty - totalLeftover);
+                const isExceeding = isOverAllowed(enteredQty, maxAllowed);
+
+                return (
+                  <Box
+                    sx={{
+                      p: 2,
+                      backgroundColor: isExceeding ? "#fef2f2" : "#eff6ff",
+                      borderRadius: "8px",
+                      border: `1px solid ${isExceeding ? "#fca5a5" : "#bfdbfe"}`,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: isExceeding ? "#991b1b" : "#1e40af",
+                        mb: 1,
+                      }}
+                    >
+                      {isExceeding
+                        ? "⚠ EXCEEDS ALLOCATED FABRIC"
+                        : "📋 DELIVERY MEMO FABRIC ALLOCATION"}
+                    </Typography>
+
+                    {isExceeding && (
+                      <Typography
+                        sx={{
+                          fontSize: "12px",
+                          color: "#dc2626",
+                          fontWeight: 500,
+                          mb: 1.5,
+                          p: 1,
+                          backgroundColor: "#fee2e2",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        Leftover quantity ({enteredQty.toFixed(2)}m) exceeds the
+                        maximum allowed ({maxAllowed.toFixed(2)}m). Please reduce
+                        the leftover amount.
+                      </Typography>
+                    )}
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "13px",
+                          color: isExceeding ? "#7c2d12" : "#1e3a8a",
+                        }}
+                      >
+                        Total Fabric Allocated:
+                      </Typography>
+                      <Typography sx={{ fontSize: "13px", fontWeight: 600 }}>
+                        {allocatedQty.toFixed(2)}m
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "13px",
+                          color: isExceeding ? "#7c2d12" : "#1e3a8a",
+                        }}
+                      >
+                        Leftover Quantity:
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "#dc2626",
+                        }}
+                      >
+                        -{enteredQty.toFixed(2)}m
+                      </Typography>
+                    </Box>
+
+                    {isExceeding && (
+                      <Typography
+                        sx={{
+                          fontSize: "12px",
+                          color: "#dc2626",
+                          fontWeight: 600,
+                          mb: 1,
+                        }}
+                      >
+                        ⚠ This entry only allows up to {maxAllowed.toFixed(2)}m
+                        of leftover. Please lower the amount by{" "}
+                        {(enteredQty - maxAllowed).toFixed(2)}m.
+                      </Typography>
+                    )}
+
+                    <Divider
+                      sx={{
+                        my: 1,
+                        borderColor: isExceeding ? "#fca5a5" : "#bfdbfe",
+                      }}
+                    />
+                    <Box
+                      sx={{ display: "flex", justifyContent: "space-between" }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: isExceeding ? "#7c2d12" : "#1e3a8a",
+                        }}
+                      >
+                        Net DM Fabric Remaining:
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: isExceeding ? "#dc2626" : "#2563eb",
+                        }}
+                      >
+                        {netRemaining.toFixed(2)}m
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })()}
+            </>
+          )}
+        </DialogContent>
+
+        <Divider sx={{ mb: 2 }} />
+
+        <DialogFooter>
+          <DialogCancelButton
+            onClick={() => setLeftoverModalOpen(false)}
+            disabled={submittingLeftover}
+            fullWidth
+          >
+            Cancel
+          </DialogCancelButton>
+
+          <DialogSubmitButton
+            variant="contained"
+            onClick={handleMarkLeftover}
+            disabled={
+              submittingLeftover ||
+              !leftoverQuantity ||
+              (() => {
+                if (!selectedEntryForLeftover) return false;
+                const allocatedQty =
+                  parseFloat(selectedEntryForLeftover.dhap || "0") *
+                  parseFloat(selectedEntryForLeftover.fold || "0");
+                const alreadyRecorded = parseFloat(
+                  selectedEntryForLeftover.leftoverQuantity || "0",
+                );
+                const maxAllowed = allocatedQty - alreadyRecorded;
+                return isOverAllowed(
+                  parseFloat(leftoverQuantity || "0"),
+                  maxAllowed,
+                );
+              })()
+            }
+            fullWidth
+            sx={{
+              backgroundColor: "#2563eb",
+              "&:hover": {
+                backgroundColor: "#1d4ed8",
+              },
+            }}
+          >
+            {submittingLeftover ? "Processing..." : "Record Leftover"}
           </DialogSubmitButton>
         </DialogFooter>
       </DialogBox>

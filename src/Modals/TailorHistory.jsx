@@ -29,6 +29,7 @@ import axiosInstance from "../utils/axiosInstance";
 import NoResponsePage from "../pages/NoResponsePage";
 import TailorViewHistory from "./TailorViewHistory";
 import { StyledTableCell, StyledTableRow } from "../components/Styled";
+import moment from "moment";
 
 export default function TailorHistory() {
   const [tailors, setTailors] = useState([]);
@@ -42,7 +43,7 @@ export default function TailorHistory() {
         setLoading(true);
         console.log("Fetching tailor statistics...");
         const response = await axiosInstance.get(
-          "/assign-tailor/tailors/statistics"
+          "/assign-tailor/tailors/statistics",
         );
         console.log("API Response:", response.data);
         setTailors(response.data?.data || []);
@@ -223,7 +224,7 @@ export default function TailorHistory() {
                       sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
                       <Typography sx={{ color: "#6b7280" }}>
-                        {tailor.createdAt
+                        {/* {tailor.createdAt
                           ? new Date(tailor.createdAt).toLocaleDateString(
                               "en-US",
                               {
@@ -232,7 +233,8 @@ export default function TailorHistory() {
                                 day: "numeric",
                               }
                             )
-                          : "N/A"}
+                          : "N/A"} */}
+                        {moment(tailor.createdAt).format("DD/MM/YYYY HH:mm")}
                       </Typography>
                     </Box>
                   </StyledTableCell>
