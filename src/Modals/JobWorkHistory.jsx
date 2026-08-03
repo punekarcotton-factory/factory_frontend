@@ -50,7 +50,9 @@ export default function JobWorkHistory() {
       try {
         setLoading(true);
         setGlobalLoading(true);
-        const response = await axiosInstance.get("/delivery-memos/job-work/summary");
+        const response = await axiosInstance.get(
+          "/delivery-memos/job-work/summary",
+        );
         setSummaryData(response.data?.data || { summary: {}, history: [] });
       } catch (error) {
         console.error("Failed to fetch Job Work summary:", error);
@@ -122,11 +124,19 @@ export default function JobWorkHistory() {
         <Grid container spacing={2} sx={{ mb: 3 }}>
           {[1, 2, 3, 4].map((i) => (
             <Grid item xs={12} sm={6} md={3} key={i}>
-              <Skeleton variant="rectangular" height={90} sx={{ borderRadius: "10px" }} />
+              <Skeleton
+                variant="rectangular"
+                height={90}
+                sx={{ borderRadius: "10px" }}
+              />
             </Grid>
           ))}
         </Grid>
-        <Skeleton variant="rectangular" height={300} sx={{ borderRadius: "10px" }} />
+        <Skeleton
+          variant="rectangular"
+          height={300}
+          sx={{ borderRadius: "10px" }}
+        />
       </Box>
     );
   }
@@ -135,156 +145,6 @@ export default function JobWorkHistory() {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Top KPI Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: "12px",
-              backgroundColor: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "10px",
-                backgroundColor: "#eef2ff",
-                color: "#4f46e5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Assignment />
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                Total Job Work Memos
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="#111827">
-                {summary.totalMemos || 0}
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: "12px",
-              backgroundColor: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "10px",
-                backgroundColor: "#eff6ff",
-                color: "#2563eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <HourglassEmpty />
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                Active Memos
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="#2563eb">
-                {summary.activeCount || 0}
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: "12px",
-              backgroundColor: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "10px",
-                backgroundColor: "#ecfdf5",
-                color: "#059669",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <CheckCircle />
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                Completed & Closed
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="#059669">
-                {summary.completedCount || 0}
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: "12px",
-              backgroundColor: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "10px",
-                backgroundColor: "#fdf2f8",
-                color: "#db2777",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Straighten />
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                Total Fabric Given
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="#db2777">
-                {summary.totalFabricGiven || 0} m
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-      </Grid>
 
       {/* History Table */}
       {history.length === 0 ? (
@@ -301,7 +161,6 @@ export default function JobWorkHistory() {
           <Table>
             <TableHead>
               <StyledTableRow sx={{ backgroundColor: "#f9fafb" }}>
-                <StyledTableCell>#</StyledTableCell>
                 <StyledTableCell>DM Number</StyledTableCell>
                 <StyledTableCell>Assigned Worker</StyledTableCell>
                 <StyledTableCell>Fabric SKU</StyledTableCell>
@@ -315,7 +174,6 @@ export default function JobWorkHistory() {
             <TableBody>
               {history.map((row, index) => (
                 <StyledTableRow key={row.deliveryMemoId}>
-                  <StyledTableCell>{index + 1}</StyledTableCell>
                   <StyledTableCell sx={{ fontWeight: 600, color: "#111827" }}>
                     {row.dmNumber}
                   </StyledTableCell>
@@ -332,8 +190,16 @@ export default function JobWorkHistory() {
                   <StyledTableCell sx={{ fontSize: "12px", color: "#6b7280" }}>
                     {moment(row.createdAt).format("DD/MM/YYYY HH:mm")}
                   </StyledTableCell>
-                  <StyledTableCell sx={{ fontSize: "12px", color: row.closedAt ? "#059669" : "#9ca3af", fontWeight: row.closedAt ? 500 : 400 }}>
-                    {row.closedAt ? moment(row.closedAt).format("DD/MM/YYYY HH:mm") : "-"}
+                  <StyledTableCell
+                    sx={{
+                      fontSize: "12px",
+                      color: row.closedAt ? "#059669" : "#9ca3af",
+                      fontWeight: row.closedAt ? 500 : 400,
+                    }}
+                  >
+                    {row.closedAt
+                      ? moment(row.closedAt).format("DD/MM/YYYY HH:mm")
+                      : "-"}
                   </StyledTableCell>
                   <StyledTableCell>
                     <IconButton
