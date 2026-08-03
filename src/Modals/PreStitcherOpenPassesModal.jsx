@@ -20,6 +20,7 @@ import {
   ListItemText,
 } from "@mui/material";
 import { Close, FilterList, Check } from "@mui/icons-material";
+import moment from "moment";
 
 const PRESTITCHER_ACTIVE_STAGES = [
   "ASSIGNED",
@@ -89,7 +90,7 @@ const PreStitcherOpenPassesModal = ({
           (item) =>
             item.fabricTitle?.toLowerCase().includes(q) ||
             item.fabricSKU?.toLowerCase().includes(q) ||
-            item.shirtSKUs?.some(sku => sku.toLowerCase().includes(q)),
+            item.shirtSKUs?.some((sku) => sku.toLowerCase().includes(q)),
         ),
     );
   }, [openPasses, openMemos, doneMemos, stageFilter, searchQuery]);
@@ -245,7 +246,9 @@ const PreStitcherOpenPassesModal = ({
                       Shirt Details
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Options</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Notes History</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      Notes History
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Created Date</TableCell>
                   </TableRow>
                 </TableHead>
@@ -262,9 +265,24 @@ const PreStitcherOpenPassesModal = ({
                                 ?.map((item) => item.fabricSKU)
                                 .join(", ") || "No SKU"}
                             </Typography>
-                            {memo.stageHistory?.find(h => h.stage === 'TASK_REASSIGNED') && (
-                              <Typography sx={{ fontSize: '10px', color: '#f59e0b', fontWeight: 600, mt: 0.5, fontStyle: 'italic' }}>
-                                Reassigned from: {memo.stageHistory.find(h => h.stage === 'TASK_REASSIGNED').metadata?.reassignedFromName}
+                            {memo.stageHistory?.find(
+                              (h) => h.stage === "TASK_REASSIGNED",
+                            ) && (
+                              <Typography
+                                sx={{
+                                  fontSize: "10px",
+                                  color: "#f59e0b",
+                                  fontWeight: 600,
+                                  mt: 0.5,
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                Reassigned from:{" "}
+                                {
+                                  memo.stageHistory.find(
+                                    (h) => h.stage === "TASK_REASSIGNED",
+                                  ).metadata?.reassignedFromName
+                                }
                               </Typography>
                             )}
                           </Box>
@@ -319,8 +337,7 @@ const PreStitcherOpenPassesModal = ({
                                   variant="body2"
                                   sx={{ mb: 0.5 }}
                                 >
-                                  {item.fabricTitle} - {item.fabricColor} 
-                                  
+                                  {item.fabricTitle} - {item.fabricColor}
                                 </Typography>
                               ))}
                             </Box>
@@ -337,7 +354,8 @@ const PreStitcherOpenPassesModal = ({
                                   variant="body2"
                                   sx={{ mb: 0.5 }}
                                 >
-                                  {item.shirtSKUs?.join(', ') || "No SKU"} - Qty: {item.shirtQuantity}
+                                  {item.shirtSKUs?.join(", ") || "No SKU"} -
+                                  Qty: {item.shirtQuantity}
                                 </Typography>
                               ))}
                             </Box>
@@ -371,49 +389,111 @@ const PreStitcherOpenPassesModal = ({
                           )}
                         </TableCell>
                         <TableCell>
-                          {memo.assignments?.some(a => a.partialCompletions?.length > 0 || a.notes) ? (
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                          {memo.assignments?.some(
+                            (a) => a.partialCompletions?.length > 0 || a.notes,
+                          ) ? (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 1,
+                              }}
+                            >
                               {memo.assignments.map((assignment, aIdx) => (
                                 <Box key={aIdx}>
                                   {/* Assignment level note if any */}
                                   {assignment.notes && (
-                                    <Box sx={{ mb: 0.5, p: 1, bgcolor: "#f9fafb", borderRadius: "4px", border: "1px solid #e5e7eb" }}>
-                                      <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#374151" }}>Initial Note:</Typography>
-                                      <Typography sx={{ fontSize: "11px", color: "#4b5563" }}>{assignment.notes}</Typography>
+                                    <Box
+                                      sx={{
+                                        mb: 0.5,
+                                        p: 1,
+                                        bgcolor: "#f9fafb",
+                                        borderRadius: "4px",
+                                        border: "1px solid #e5e7eb",
+                                      }}
+                                    >
+                                      <Typography
+                                        sx={{
+                                          fontSize: "11px",
+                                          fontWeight: 700,
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        Initial Note:
+                                      </Typography>
+                                      <Typography
+                                        sx={{
+                                          fontSize: "11px",
+                                          color: "#4b5563",
+                                        }}
+                                      >
+                                        {assignment.notes}
+                                      </Typography>
                                     </Box>
                                   )}
                                   {/* Partial completion notes */}
-                                  {assignment.partialCompletions?.map((pc, pcIdx) => (
-                                    pc.notes && (
-                                      <Box key={pcIdx} sx={{ mb: 0.5, p: 1, bgcolor: "#f0fdf4", borderRadius: "4px", border: "1px solid #dcfce7" }}>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.25 }}>
-                                          <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#166534" }}>Partial Update:</Typography>
-                                          <Typography sx={{ fontSize: "9px", color: "#6b7280" }}>
-                                            {new Date(pc.createdAt).toLocaleDateString()}
+                                  {assignment.partialCompletions?.map(
+                                    (pc, pcIdx) =>
+                                      pc.notes && (
+                                        <Box
+                                          key={pcIdx}
+                                          sx={{
+                                            mb: 0.5,
+                                            p: 1,
+                                            bgcolor: "#f0fdf4",
+                                            borderRadius: "4px",
+                                            border: "1px solid #dcfce7",
+                                          }}
+                                        >
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              mb: 0.25,
+                                            }}
+                                          >
+                                            <Typography
+                                              sx={{
+                                                fontSize: "10px",
+                                                fontWeight: 700,
+                                                color: "#166534",
+                                              }}
+                                            >
+                                              Partial Update:
+                                            </Typography>
+                                            <Typography
+                                              sx={{
+                                                fontSize: "9px",
+                                                color: "#6b7280",
+                                              }}
+                                            >
+                                              {new Date(
+                                                pc.createdAt,
+                                              ).toLocaleDateString()}
+                                            </Typography>
+                                          </Box>
+                                          <Typography
+                                            sx={{
+                                              fontSize: "11px",
+                                              color: "#15803d",
+                                            }}
+                                          >
+                                            {pc.notes}
                                           </Typography>
                                         </Box>
-                                        <Typography sx={{ fontSize: "11px", color: "#15803d" }}>{pc.notes}</Typography>
-                                      </Box>
-                                    )
-                                  ))}
+                                      ),
+                                  )}
                                 </Box>
                               ))}
                             </Box>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">No notes</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              No notes
+                            </Typography>
                           )}
                         </TableCell>
                         <TableCell>
-                          {memo.createdAt
-                            ? new Date(memo.createdAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )
-                            : "N/A"}
+                          {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
                         </TableCell>
                       </TableRow>
                     );

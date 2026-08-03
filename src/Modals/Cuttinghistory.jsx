@@ -17,6 +17,7 @@ import NoResponsePage from "../pages/NoResponsePage";
 import { StyledTableCell, StyledTableRow } from "../components/Styled";
 import CuttingViewHistory from "./CuttingViewHistory";
 import { resolveImageUrl } from "../config";
+import moment from "moment";
 
 export default function CuttingHistory() {
   const [cuttingData, setCuttingData] = useState([]);
@@ -209,12 +210,16 @@ export default function CuttingHistory() {
 
                   <StyledTableCell>
                     <Typography sx={{ fontSize: "14px", color: "#6b7280" }}>
-                      {memo.stageHistory?.length
+                      {/* {memo.stageHistory?.length
                         ? new Date(
                             memo.stageHistory[memo.stageHistory.length - 1]
                               .enteredAt,
                           ).toLocaleString()
-                        : "N/A"}
+                        : "N/A"} */}
+                      {moment(
+                        memo.stageHistory[memo.stageHistory.length - 1]
+                          .enteredAt,
+                      ).format("DD/MM/YYYY HH:mm")}
                     </Typography>
                   </StyledTableCell>
 

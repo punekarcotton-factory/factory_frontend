@@ -13,24 +13,28 @@ import {
   Autocomplete,
   CircularProgress,
   Divider,
+  Collapse,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import WorkIcon from "@mui/icons-material/Work";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useDispatch } from "react-redux";
 import { showSnackbar } from "../Slice/snackbarSlice";
 import axiosInstance from "../utils/axiosInstance";
+
+const EMPTY_ENTRY = () => ({ fabricSKU: "", fabricGiven: "", notes: "" });
 
 const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) => {
   const dispatch = useDispatch();
 
   const [fabricSKUs, setFabricSKUs] = useState([]);
   const [loadingFabrics, setLoadingFabrics] = useState(false);
-  const [selectedFabric, setSelectedFabric] = useState(null);
-
-  const [fabricGiven, setFabricGiven] = useState("");
   const [dmNumber, setDmNumber] = useState("");
-  const [notes, setNotes] = useState("");
-
+  const [entries, setEntries] = useState([EMPTY_ENTRY()]);
+  const [expandedIndex, setExpandedIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,12 +49,8 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
       color: "#6b7280",
     },
     "& .MuiOutlinedInput-root": {
-      "& fieldset": {
-        borderColor: "#e5e7eb",
-      },
-      "&:hover fieldset": {
-        borderColor: "#667eea",
-      },
+      "& fieldset": { borderColor: "#e5e7eb" },
+      "&:hover fieldset": { borderColor: "#667eea" },
       "&.Mui-focused fieldset": {
         borderColor: "#667eea",
         borderWidth: "1.5px",
@@ -58,20 +58,13 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
     },
   };
 
-  const generateDmNumber = () => {
-    const timestamp = Date.now().toString().slice(-4);
-    const random = Math.floor(100 + Math.random() * 900);
-    return `JW-${timestamp}${random}`;
-  };
-
   useEffect(() => {
     if (!open) return;
 
     setError("");
-    setSelectedFabric(null);
-    setFabricGiven("");
-    setNotes("");
-    setDmNumber(generateDmNumber());
+    setDmNumber("");
+    setEntries([EMPTY_ENTRY()]);
+    setExpandedIndex(0);
 
     const fetchFabrics = async () => {
       setLoadingFabrics(true);
@@ -88,30 +81,99 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
     fetchFabrics();
   }, [open]);
 
+  // ─── Entry helpers ───────────────────────────────────────────────────────────
+
+  const getSelectedFabric = (sku) => fabricSKUs.find((f) => f.sku === sku) || null;
+
+  const getAvailableSKUsForEntry = (currentIndex) => {
+    const usedSKUs = entries
+      .map((e, idx) => (idx !== currentIndex ? e.fabricSKU : null))
+      .filter(Boolean);
+    return fabricSKUs.filter((f) => !usedSKUs.includes(f.sku));
+  };
+
+  const isEntryComplete = (entry) =>
+    entry.fabricSKU && entry.fabricGiven;
+
+  const handleEntryChange = (index, field, value) => {
+    if (field === "fabricSKU" && value) {
+      const isDuplicate = entries.some(
+        (e, idx) => idx !== index && e.fabricSKU === value
+      );
+      if (isDuplicate) {
+        setError(`SKU "${value}" is already added. Please select a different SKU.`);
+        return;
+      }
+    }
+    setEntries((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+    if (error) setError("");
+  };
+
+  const handleAddRow = () => {
+    setEntries((prev) => [...prev, EMPTY_ENTRY()]);
+    setExpandedIndex(entries.length); // expand newly added row
+  };
+
+  const handleRemoveRow = (index) => {
+    setEntries((prev) => prev.filter((_, i) => i !== index));
+    if (expandedIndex === index) {
+      setExpandedIndex(Math.max(0, index - 1));
+    } else if (expandedIndex > index) {
+      setExpandedIndex(expandedIndex - 1);
+    }
+  };
+
+  const handleToggleExpand = (index) => {
+    setExpandedIndex(expandedIndex === index ? -1 : index);
+  };
+
+  // ─── Submit ──────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!selectedFabric) {
-      setError("Please select a Fabric SKU.");
-      return;
-    }
-
-    const givenQty = parseFloat(fabricGiven);
-    if (isNaN(givenQty) || givenQty <= 0) {
-      setError("Please enter a valid fabric quantity in meters.");
-      return;
-    }
-
-    if (givenQty > selectedFabric.quantity) {
-      setError(
-        `Quantity (${givenQty}m) exceeds available stock (${selectedFabric.quantity}m).`
-      );
-      return;
-    }
-
     if (!dmNumber.trim()) {
       setError("Delivery Memo Number (DM Number) is required.");
+      return;
+    }
+
+    // Validate each entry
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+
+      if (!entry.fabricSKU) {
+        setError(`Entry #${i + 1}: Please select a Fabric SKU.`);
+        setExpandedIndex(i);
+        return;
+      }
+
+      const givenQty = parseFloat(entry.fabricGiven);
+      if (isNaN(givenQty) || givenQty <= 0) {
+        setError(`Entry #${i + 1}: Please enter a valid fabric quantity (meters).`);
+        setExpandedIndex(i);
+        return;
+      }
+
+      const fabric = getSelectedFabric(entry.fabricSKU);
+      if (fabric && givenQty > fabric.quantity) {
+        setError(
+          `Entry #${i + 1}: Quantity (${givenQty}m) exceeds available stock (${fabric.quantity}m) for ${entry.fabricSKU}.`
+        );
+        setExpandedIndex(i);
+        return;
+      }
+    }
+
+    // Duplicate SKU check across all entries
+    const skuList = entries.map((e) => e.fabricSKU);
+    const duplicates = skuList.filter((sku, i) => skuList.indexOf(sku) !== i);
+    if (duplicates.length > 0) {
+      setError(`Duplicate SKU(s) found: ${[...new Set(duplicates)].join(", ")}. Each SKU can only appear once.`);
       return;
     }
 
@@ -120,15 +182,22 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
     setSubmitting(true);
 
     try {
+      const memoItems = entries.map((entry) => {
+        const qty = parseFloat(entry.fabricGiven);
+        return {
+          fabricSKU: entry.fabricSKU,
+          dhap: String(qty),
+          fold: "1",
+          totalDhapFold: qty,
+        };
+      });
+
+      // Use the first entry's fabric for top-level fields (backward-compat)
+      const firstEntry = entries[0];
+      const firstQty = parseFloat(firstEntry.fabricGiven);
+
       const payload = {
-        memos: [
-          {
-            fabricSKU: selectedFabric.sku,
-            dhap: String(givenQty),
-            fold: "1",
-            totalDhapFold: givenQty,
-          },
-        ],
+        memos: memoItems,
         dmNumber: dmNumber.trim(),
         createdBy: String(userId),
         stage: "JOB_WORK",
@@ -136,9 +205,9 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         jobWorkWorkerId: null,
         jobWorkWorkerName: null,
         jobWorkStatus: "PENDING",
-        fabricGiven: givenQty,
-        fabricSKU: selectedFabric.sku,
-        notes: notes.trim(),
+        fabricGiven: firstQty,
+        fabricSKU: firstEntry.fabricSKU,
+        notes: entries.map((e) => e.notes?.trim()).filter(Boolean).join("; "),
       };
 
       await axiosInstance.post("/delivery-memos", payload);
@@ -147,7 +216,7 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         showSnackbar({
           open: true,
           severity: "success",
-          message: "Job Work Delivery Memo created successfully!",
+          message: `${entries.length} Job Work Delivery Memo${entries.length > 1 ? "s" : ""} created successfully!`,
         })
       );
 
@@ -163,19 +232,23 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
     }
   };
 
+  const handleClose = () => {
+    if (!submitting) onClose();
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: {
-          borderRadius: "16px",
-          p: 1,
-        },
+        sx: { borderRadius: "16px", p: 1 },
       }}
     >
+      {/* ── Header ── */}
       <DialogTitle
         sx={{
           display: "flex",
@@ -201,14 +274,15 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
               Create Job Work Memo
             </Typography>
             <Typography variant="body2" color="text.secondary" fontSize="12px">
-              Allocate fabric to create a new Job Work Delivery Memo
+              Allocate fabric to create Job Work Delivery Memo(s)
             </Typography>
           </Box>
         </Box>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={handleClose} size="small" disabled={submitting}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
+
       <Divider />
 
       <DialogContent sx={{ pt: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -218,78 +292,277 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
           </Alert>
         )}
 
+        {loadingFabrics && (
+          <Box sx={{ textAlign: "center" }}>
+            <CircularProgress size={24} />
+            <Typography sx={{ fontSize: "12px", color: "#6b7280", mt: 1 }}>
+              Loading fabrics…
+            </Typography>
+          </Box>
+        )}
+
+        {!loadingFabrics && fabricSKUs.length === 0 && (
+          <Alert severity="warning">
+            No fabrics with available quantity found. Please add fabrics first.
+          </Alert>
+        )}
+
         {/* DM Number */}
-        <TextField
-          label="DM Number"
-          value={dmNumber}
-          onChange={(e) => setDmNumber(e.target.value)}
-          fullWidth
-          required
-          placeholder="e.g. JW-1001"
-          sx={textFieldStyle}
-        />
+        <Box>
+          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#374151", mb: 1 }}>
+            DM Number
+          </Typography>
+          <TextField
+            placeholder="e.g. JW-1001"
+            value={dmNumber}
+            onChange={(e) => setDmNumber(e.target.value)}
+            fullWidth
+            required
+            size="small"
+            disabled={submitting}
+            sx={textFieldStyle}
+          />
+        </Box>
 
-        {/* Select Fabric */}
-        <Autocomplete
-          options={fabricSKUs}
-          getOptionLabel={(option) =>
-            `${option.sku} - ${option.title || "Fabric"} (${option.color || "N/A"}) [Avail: ${option.quantity}m]`
-          }
-          value={selectedFabric}
-          onChange={(event, newValue) => setSelectedFabric(newValue)}
-          loading={loadingFabrics}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Select Fabric SKU"
-              placeholder="Search fabric SKU"
-              required
-              sx={textFieldStyle}
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: (
-                  <React.Fragment>
-                    {loadingFabrics ? <CircularProgress color="inherit" size={20} /> : null}
-                    {params.InputProps.endAdornment}
-                  </React.Fragment>
-                ),
+        {/* ── Entries ── */}
+        {entries.map((entry, index) => {
+          const selectedFabric = getSelectedFabric(entry.fabricSKU);
+          const givenQty = parseFloat(entry.fabricGiven || "0");
+          const isComplete = isEntryComplete(entry);
+          const isExpanded = expandedIndex === index;
+          const availableSKUs = getAvailableSKUsForEntry(index);
+
+          const hasInsufficientQty =
+            selectedFabric &&
+            !isNaN(givenQty) &&
+            givenQty > 0 &&
+            givenQty > selectedFabric.quantity;
+
+          return (
+            <Box
+              key={index}
+              sx={{
+                border: `1px solid ${hasInsufficientQty ? "#fca5a5" : "#e5e7eb"}`,
+                borderRadius: "10px",
+                overflow: "hidden",
+                transition: "all 0.2s",
+                backgroundColor: "#ffffff",
               }}
-            />
-          )}
-        />
+            >
+              {/* Card header / collapsed summary */}
+              <Box
+                onClick={() => handleToggleExpand(index)}
+                sx={{
+                  p: 2,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: isExpanded ? "#f9fafb" : "transparent",
+                  "&:hover": { backgroundColor: "#f9fafb" },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+                  {/* Index badge */}
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "8px",
+                      backgroundColor: "#667eea",
+                      color: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 600,
+                      fontSize: "14px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {index + 1}
+                  </Box>
 
-        {/* Fabric Given */}
-        <TextField
-          label="Fabric Quantity Given (Meters)"
-          type="number"
-          value={fabricGiven}
-          onChange={(e) => setFabricGiven(e.target.value)}
-          fullWidth
-          required
-          placeholder="e.g. 50"
-          helperText={
-            selectedFabric ? `Available: ${selectedFabric.quantity} meters` : ""
-          }
-          inputProps={{ min: 0.1, step: 0.1 }}
-          sx={textFieldStyle}
-        />
+                  {/* Summary text */}
+                  <Box sx={{ flex: 1 }}>
+                    {isComplete ? (
+                      <>
+                        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+                          {entry.fabricSKU}
+                        </Typography>
+                        <Typography sx={{ fontSize: "12px", color: "#6b7280" }}>
+                          {givenQty}m given
+                          {selectedFabric ? ` — Avail: ${selectedFabric.quantity}m` : ""}
+                        </Typography>
+                      </>
+                    ) : (
+                      <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#6b7280" }}>
+                        Job Work #{index + 1} — Click to fill details
+                      </Typography>
+                    )}
+                  </Box>
 
-        {/* Notes */}
-        <TextField
-          label="Notes / Instructions (Optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+                  {isComplete && !hasInsufficientQty && (
+                    <CheckCircleIcon sx={{ fontSize: 20, color: "#16a34a" }} />
+                  )}
+                  {hasInsufficientQty && (
+                    <Typography sx={{ fontSize: "11px", color: "#ef4444", fontWeight: 600 }}>
+                      Exceeds stock
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {entries.length > 1 && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveRow(index);
+                      }}
+                      disabled={submitting}
+                      sx={{
+                        color: "#ef4444",
+                        "&:hover": { backgroundColor: "#fef2f2" },
+                      }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                  <IconButton
+                    size="small"
+                    sx={{
+                      transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.3s",
+                    }}
+                  >
+                    <ExpandMoreIcon />
+                  </IconButton>
+                </Box>
+              </Box>
+
+              {/* Expanded form fields */}
+              <Collapse in={isExpanded}>
+                <Box sx={{ p: 2, pt: 1.5, display: "flex", flexDirection: "column", gap: 2, backgroundColor: "#ffffff" }}>
+                  {/* Fabric SKU */}
+                  <Box>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 500, color: "#374151", mb: 0.75 }}>
+                      Fabric SKU
+                    </Typography>
+                    <Autocomplete
+                      options={availableSKUs}
+                      getOptionLabel={(option) =>
+                        typeof option === "string"
+                          ? option
+                          : `${option.sku} — ${option.title || "Fabric"} (${option.color || "N/A"}) [Avail: ${option.quantity}m]`
+                      }
+                      value={selectedFabric || null}
+                      onChange={(_, newValue) => {
+                        handleEntryChange(index, "fabricSKU", newValue?.sku || "");
+                      }}
+                      loading={loadingFabrics}
+                      disabled={submitting || fabricSKUs.length === 0}
+                      isOptionEqualToValue={(option, value) => option.sku === value?.sku}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Search fabric SKU"
+                          size="small"
+                          required
+                          sx={textFieldStyle}
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {loadingFabrics ? <CircularProgress color="inherit" size={16} /> : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+
+                  {/* Fabric Given (meters) */}
+                  <Box>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 500, color: "#374151", mb: 0.75 }}>
+                      Fabric Quantity Given (Meters)
+                    </Typography>
+                    <TextField
+                      type="number"
+                      value={entry.fabricGiven}
+                      onChange={(e) => handleEntryChange(index, "fabricGiven", e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      fullWidth
+                      required
+                      size="small"
+                      placeholder="e.g. 50"
+                      helperText={
+                        selectedFabric
+                          ? hasInsufficientQty
+                            ? `⚠ Exceeds available stock (${selectedFabric.quantity}m)`
+                            : `Available: ${selectedFabric.quantity}m`
+                          : ""
+                      }
+                      FormHelperTextProps={{
+                        sx: { color: hasInsufficientQty ? "#ef4444" : "#6b7280" },
+                      }}
+                      inputProps={{ min: 0.1, step: 0.1 }}
+                      disabled={submitting}
+                      sx={textFieldStyle}
+                    />
+                  </Box>
+
+                  {/* Notes */}
+                  <Box>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 500, color: "#374151", mb: 0.75 }}>
+                      Notes / Instructions (Optional)
+                    </Typography>
+                    <TextField
+                      value={entry.notes}
+                      onChange={(e) => handleEntryChange(index, "notes", e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={2}
+                      size="small"
+                      placeholder="Add any specific instructions for this job work…"
+                      disabled={submitting}
+                      sx={textFieldStyle}
+                    />
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
+          );
+        })}
+
+        {/* Add another row */}
+        <Button
+          startIcon={<AddCircleOutlineIcon />}
+          onClick={handleAddRow}
+          disabled={submitting || fabricSKUs.length === 0}
+          sx={{
+            textTransform: "none",
+            color: "#667eea",
+            borderRadius: "8px",
+            border: "1.5px dashed #667eea",
+            py: 1,
+            fontWeight: 600,
+            fontSize: "13px",
+            "&:hover": {
+              backgroundColor: "#eef2ff",
+              border: "1.5px dashed #4f46e5",
+            },
+          }}
           fullWidth
-          multiline
-          rows={3}
-          placeholder="Add any specific instructions for job work..."
-          sx={textFieldStyle}
-        />
+        >
+          Add Another Job Work
+        </Button>
       </DialogContent>
 
       <DialogActions sx={{ p: 2, pt: 1 }}>
         <Button
-          onClick={onClose}
+          onClick={handleClose}
           disabled={submitting}
           sx={{
             textTransform: "none",
@@ -303,7 +576,7 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={submitting}
+          disabled={submitting || loadingFabrics}
           sx={{
             textTransform: "none",
             borderRadius: "8px",
@@ -316,7 +589,11 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
             },
           }}
         >
-          {submitting ? <CircularProgress size={24} color="inherit" /> : "Create Memo"}
+          {submitting ? (
+            <CircularProgress size={22} color="inherit" />
+          ) : (
+            `Create ${entries.length > 1 ? `${entries.length} Memos` : "Memo"}`
+          )}
         </Button>
       </DialogActions>
     </Dialog>

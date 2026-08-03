@@ -18,7 +18,6 @@ import { useSelector, useDispatch } from "react-redux";
 import { useLocation } from "react-router-dom";
 import moment from "moment";
 import axiosInstance from "../../utils/axiosInstance";
-import { useLocation } from "react-router-dom";
 import { getMemoTitle } from "../../utils/deliveryMemo";
 import { CreateButton } from "../Styled";
 import NoResponsePage from "../../pages/NoResponsePage";
@@ -133,7 +132,7 @@ const JobWorkStage = () => {
     return { pending, inProcess };
   }, [memos]);
 
-  const getCurrentMemos = () => {
+  const getCurrentMemos = useCallback(() => {
     switch (activeTab) {
       case 0:
         return groupedMemos.pending;
@@ -142,7 +141,7 @@ const JobWorkStage = () => {
       default:
         return groupedMemos.pending;
     }
-  };
+  }, [activeTab, groupedMemos]);
 
   const getStatusChipProps = (memo) => {
     const status = memo.jobWorkStatus || "PENDING";
@@ -213,9 +212,7 @@ const JobWorkStage = () => {
       const id = (m.deliveryMemoId || m._id || "").toLowerCase();
       return dm === q || id === q || dm.includes(q) || id.includes(q);
     });
-  }, [memos, searchDmNumber, activeTab, groupedMemos]);
-
-  const currentMemosList = getCurrentMemos();
+  }, [memos, searchDmNumber, getCurrentMemos]);
 
   if (loading) {
     return (
@@ -232,13 +229,13 @@ const JobWorkStage = () => {
         >
           <Skeleton
             variant="rectangular"
-            width={{ xs: "100%", sm: 250 }}
             height={44}
+            sx={{ width: { xs: "100%", sm: 250 } }}
           />
           <Skeleton
             variant="text"
-            width={{ xs: "100%", sm: 180 }}
             height={40}
+            sx={{ width: { xs: "100%", sm: 180 } }}
           />
         </Box>
         <Grid container spacing={2.5}>
@@ -528,7 +525,7 @@ const JobWorkStage = () => {
                           }}
                         >
                           {memo.jobWorkWorkerName
-                            ? `${memo.jobWorkWorkerName}${memo.jobWorkWorkerPhone ? ` (${memo.jobWorkWorkerPhone})` : ""}`
+                            ? `${memo.jobWorkWorkerName}`
                             : "Not assigned yet"}
                         </Typography>
                       </Box>
