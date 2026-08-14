@@ -192,9 +192,14 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         };
       });
 
-      // Use the first entry's fabric for top-level fields (backward-compat)
-      const firstEntry = entries[0];
-      const firstQty = parseFloat(firstEntry.fabricGiven);
+      // Calculate total fabric given and combine all SKUs for top-level fields
+      const totalGiven = entries.reduce(
+        (sum, e) => sum + (parseFloat(e.fabricGiven) || 0),
+        0
+      );
+      const allSKUs = Array.from(
+        new Set(entries.map((e) => e.fabricSKU).filter(Boolean))
+      ).join(", ");
 
       const payload = {
         memos: memoItems,
@@ -205,8 +210,8 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         jobWorkWorkerId: null,
         jobWorkWorkerName: null,
         jobWorkStatus: "PENDING",
-        fabricGiven: firstQty,
-        fabricSKU: firstEntry.fabricSKU,
+        fabricGiven: totalGiven,
+        fabricSKU: allSKUs,
         notes: entries.map((e) => e.notes?.trim()).filter(Boolean).join("; "),
       };
 
@@ -216,7 +221,7 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
         showSnackbar({
           open: true,
           severity: "success",
-          message: `${entries.length} Job Work Delivery Memo${entries.length > 1 ? "s" : ""} created successfully!`,
+          message: `Job Work Delivery Memo created successfully with ${entries.length} fabric item${entries.length > 1 ? "s" : ""}!`,
         })
       );
 
@@ -592,7 +597,7 @@ const CreateJobWorkMemoModal = ({ open, onClose, onMemoCreated, currentUser }) =
           {submitting ? (
             <CircularProgress size={22} color="inherit" />
           ) : (
-            `Create ${entries.length > 1 ? `${entries.length} Memos` : "Memo"}`
+            `Create Memo${entries.length > 1 ? ` (${entries.length} items)` : ""}`
           )}
         </Button>
       </DialogActions>

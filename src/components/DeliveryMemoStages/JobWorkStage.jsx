@@ -407,8 +407,20 @@ const JobWorkStage = () => {
           {currentMemosList.map((memo) => {
             const chipProps = getStatusChipProps(memo);
             const fabricSKU =
-              memo.fabricSKU || memo.items?.[0]?.fabricSKU || "N/A";
-            const fabricGiven = memo.fabricGiven || memo.totalDhapFold || 0;
+              memo.items && memo.items.length > 0
+                ? Array.from(
+                    new Set(memo.items.map((i) => i.fabricSKU).filter(Boolean)),
+                  ).join(", ")
+                : memo.fabricSKU || "N/A";
+
+            const fabricGiven =
+              Number(memo.totalDhapFold) ||
+              (memo.items && memo.items.length > 0
+                ? memo.items.reduce(
+                    (sum, i) => sum + (parseFloat(i.totalDhapFold) || 0),
+                    0,
+                  )
+                : Number(memo.fabricGiven) || 0);
 
             return (
               <Grid item xs={12} sm={6} md={4} lg={3} key={memo.deliveryMemoId}>

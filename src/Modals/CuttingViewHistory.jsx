@@ -107,7 +107,11 @@ export default function CuttingViewHistory({ open, onClose, selectedMemo }) {
               </Box>
             )}
 
-            {moment(memo.createdAt).format("DD/MM/YYYY HH:mm")}
+            {memoData.createdAt && (
+              <Typography sx={{ fontSize: "13px", color: "#6b7280", mb: 2 }}>
+                Created: {moment(memoData.createdAt).format("DD/MM/YYYY HH:mm")}
+              </Typography>
+            )}
 
             {/* Summary chips */}
             <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
