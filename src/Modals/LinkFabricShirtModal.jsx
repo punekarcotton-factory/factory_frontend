@@ -919,44 +919,54 @@ const LinkFabricShirtModal = ({ open, onClose, onSuccess }) => {
         )}
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-          {/* Fabric SKU Dropdown */}
+          {/* Fabric SKU Selection */}
           <Box>
             <Typography sx={{ fontSize: "13px", fontWeight: 600, mb: 1, color: "#374151" }}>
               Fabric SKU <span style={{ color: "#ef4444" }}>*</span>
             </Typography>
-            <TextField
-              select
-              fullWidth
-              value={formData.fabricSKU}
-              onChange={(e) => handleInputChange("fabricSKU", e.target.value)}
-              placeholder="Select Fabric SKU"
-              error={!!errors.fabricSKU}
-              helperText={errors.fabricSKU}
+            <Autocomplete
+              options={fabrics}
+              getOptionLabel={(fabric) =>
+                typeof fabric === "string" ? fabric : fabric.sku || ""
+              }
+              filterOptions={(options, { inputValue }) =>
+                options.filter(
+                  (f) =>
+                    f.sku?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                    f.title?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                    f.color?.toLowerCase().includes(inputValue.toLowerCase())
+                )
+              }
+              value={fabrics.find((f) => f.sku === formData.fabricSKU) || null}
+              onChange={(_, newValue) =>
+                handleInputChange(
+                  "fabricSKU",
+                  typeof newValue === "string" ? newValue : newValue?.sku || ""
+                )
+              }
               disabled={loading || submitting}
               sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-            >
-              {loading ? (
-                <MenuItem disabled>
-                  <CircularProgress size={20} sx={{ mr: 1 }} />
-                  Loading fabrics...
-                </MenuItem>
-              ) : fabrics.length === 0 ? (
-                <MenuItem disabled>No fabrics available</MenuItem>
-              ) : (
-                fabrics.map((fabric) => (
-                  <MenuItem key={fabric._id} value={fabric.sku}>
-                    <Box sx={{ display: "flex", flexDirection: "column" }}>
-                      <Typography sx={{ fontSize: "14px", fontWeight: 600 }}>
-                        {fabric.sku}
-                      </Typography>
-                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
-                        {fabric.title} {fabric.color && `• ${fabric.color}`}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Select Fabric SKU"
+                  error={!!errors.fabricSKU}
+                  helperText={errors.fabricSKU}
+                />
               )}
-            </TextField>
+              renderOption={(props, fabric) => (
+                <Box component="li" {...props} key={fabric._id || fabric.sku}>
+                  <Box sx={{ display: "flex", flexDirection: "column" }}>
+                    <Typography sx={{ fontSize: "14px", fontWeight: 600 }}>
+                      {fabric.sku}
+                    </Typography>
+                    <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
+                      {fabric.title} {fabric.color && `• ${fabric.color}`}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            />
             <Typography sx={{ fontSize: "11px", color: "#6b7280", mt: 0.5, ml: 0.5 }}>
               Select the Fabric SKU you want to link from the list
             </Typography>
